@@ -27,6 +27,7 @@ export type AuthResponse = {
   success: boolean;
   message: string;
   token: string;
+  token_type: string;
   partner_id: number;
   full_name?: string | null;
   email?: string | null;
@@ -97,6 +98,17 @@ export type LiveWallet = {
   transactions: LiveWalletTransaction[];
 };
 
+export type LiveWarehouseHolding = {
+  warehouse_id: number | null;
+  warehouse_name: string | null;
+  units: number;
+};
+
+export type LiveHoldings = {
+  total_units: number;
+  per_warehouse: LiveWarehouseHolding[];
+};
+
 export type LiveReferral = {
   referral_id: string;
   name: string;
@@ -158,17 +170,97 @@ export type LiveTransfersPayload = {
   transfers: LiveTransfer[];
 };
 
+export type AdminUser = {
+  partner_id: number;
+  name: string;
+  email: string;
+  role: string;
+  kyc_status: 'pending' | 'approved' | 'rejected' | string;
+  created_at?: string | null;
+};
+
+export type AdminWarehouse = {
+  id: number;
+  name: string;
+  code?: string | null;
+  lot_stock_id?: number | null;
+};
+
+export type AdminWarehouseSales = {
+  warehouse_id: number;
+  warehouse_name?: string | null;
+  units_sold: number;
+};
+
+export type AdminInvoice = {
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  amount: number;
+  customer_name: string;
+  customer_email?: string | null;
+  payment_state?: string | null;
+  order_reference?: string | null;
+};
+
+export type AdminOrder = {
+  order_id: number;
+  order_number: string;
+  total_amount: number;
+  status: string;
+  customer_name: string;
+  created_at: string;
+};
+
+export type AdminDashboardSummary = {
+  units_sold: number;
+  total_revenue: number;
+  total_capacity: number;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
+/**
+ * Retrieve the JWT token stored in localStorage (if available).
+ * Returns null during SSR or when no token is saved.
+ */
+function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('animalkart-auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const authHeaders: Record<string, string> = {};
+  if (token) {
+    authHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(init?.headers || {}),
     },
     cache: 'no-store',
   });
+
+  // Auto-logout on expired/invalid token
+  if (response.status === 401 && token) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('animalkart-auth');
+      window.location.href = '/auth/login';
+    }
+    throw new Error('Session expired. Redirecting to login...');
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -215,6 +307,12 @@ export async function loginUser(email: string): Promise<AuthResponse> {
   return apiRequest<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email }),
+  });
+}
+
+export async function demoAdminLogin(): Promise<AuthResponse> {
+  return apiRequest<AuthResponse>('/auth/demo-admin', {
+    method: 'POST',
   });
 }
 
@@ -327,6 +425,16 @@ export async function fetchRewards(email: string): Promise<LiveRewards> {
   };
 }
 
+export async function fetchHoldings(email: string): Promise<LiveHoldings> {
+  const data = await apiRequest<{ success: boolean } & LiveHoldings>(
+    `/api/holdings?email=${encodeURIComponent(email)}`
+  );
+  return {
+    total_units: data.total_units,
+    per_warehouse: data.per_warehouse,
+  };
+}
+
 export async function fetchTransfers(email: string): Promise<LiveTransfersPayload> {
   const data = await apiRequest<{ success: boolean } & LiveTransfersPayload>(`/api/transfers?email=${encodeURIComponent(email)}`);
   return {
@@ -346,4 +454,194 @@ export async function createTransferRequest(payload: {
     body: JSON.stringify(payload),
   });
   return data.item;
+}
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  const data = await apiRequest<{
+    success: boolean; count: number; items: Array<{
+      partner_id: number;
+      name: string;
+      email: string;
+      kyc_status: string;
+    }>
+  }>('/api/admin/kyc/all');
+  return data.items.map((item) => ({
+    partner_id: item.partner_id,
+    name: item.name,
+    email: item.email,
+    role: 'investor',
+    kyc_status: item.kyc_status as AdminUser['kyc_status'],
+    created_at: null,
+  }));
+}
+
+export async function fetchPendingKyc(): Promise<AdminUser[]> {
+  const data = await apiRequest<{
+    success: boolean; count: number; items: Array<{
+      partner_id: number;
+      name: string;
+      email: string;
+      kyc_status: string;
+    }>
+  }>('/api/admin/kyc/pending');
+  return data.items.map((item) => ({
+    partner_id: item.partner_id,
+    name: item.name,
+    email: item.email,
+    role: 'investor',
+    kyc_status: item.kyc_status as AdminUser['kyc_status'],
+    created_at: null,
+  }));
+}
+
+export async function updateKycStatus(
+  partnerId: number,
+  _email: string,
+  status: 'pending' | 'approved' | 'rejected',
+): Promise<void> {
+  await apiRequest<{ partner_id: number; kyc_status: string; status: string }>(`/api/admin/kyc/${partnerId}`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+}
+
+// ── Admin Warehouse types & APIs ────────────────────────────────────────────
+
+export type AdminWarehouseStock = {
+  warehouse_id: number;
+  warehouse_name: string;
+  product_id: number;
+  product_name: string;
+  sku?: string | null;
+  unit_price: number;
+  qty_available: number;
+};
+
+export async function fetchAdminWarehouses(): Promise<AdminWarehouse[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminWarehouse[] }>('/admin/warehouses');
+  return data.items;
+}
+
+export async function fetchAdminWarehouseStock(warehouseId: number): Promise<AdminWarehouseStock[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminWarehouseStock[] }>(
+    `/api/admin/warehouses/${warehouseId}/stock`,
+  );
+  return data.items;
+}
+
+export async function createAdminWarehouse(payload: { name: string; code: string }): Promise<AdminWarehouse> {
+  const data = await apiRequest<{ id: number; name: string; code: string; lot_stock_id?: number | null }>(
+    '/api/admin/warehouses',
+    { method: 'POST', body: JSON.stringify(payload) },
+  );
+  return { id: data.id, name: data.name, code: data.code, lot_stock_id: data.lot_stock_id ?? null };
+}
+
+export async function updateAdminWarehouse(
+  warehouseId: number,
+  payload: { name?: string; code?: string },
+): Promise<void> {
+  await apiRequest<{ warehouse_id: number; updated_fields: object; status: string }>(
+    `/api/admin/warehouses/${warehouseId}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
+  );
+}
+
+export async function deleteAdminWarehouse(warehouseId: number): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/api/admin/warehouses/${warehouseId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function addAdminWarehouseStock(payload: {
+  product_id: number;
+  warehouse_id: number;
+  quantity: number;
+}): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>('/api/admin/stock/add', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── Admin Invoice & Order APIs ────────────────────────────────────────────────
+
+export async function fetchAdminInvoices(): Promise<AdminInvoice[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminInvoice[] }>('/admin/invoices');
+  return data.items;
+}
+
+export async function actionAdminInvoice(
+  invoiceId: number,
+  action: 'validate' | 'pay' | 'cancel',
+): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/api/admin/invoices/${invoiceId}/action`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+}
+
+export async function payAdminInvoice(invoiceId: number): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/api/admin/invoice/${invoiceId}/pay`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchAdminDashboardSummary(): Promise<AdminDashboardSummary> {
+  const data = await apiRequest<AdminDashboardSummary>('/admin/dashboard/summary');
+  return data;
+}
+
+export async function fetchAdminWarehouseSales(): Promise<AdminWarehouseSales[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminWarehouseSales[] }>('/admin/warehouse-sales');
+  return data.items;
+}
+
+export async function fetchAdminOrders(): Promise<AdminOrder[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminOrder[] }>('/admin/orders');
+  return data.items;
+}
+
+export async function approveAdminOrder(orderId: number): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/api/admin/orders/${orderId}/approve`, {
+    method: 'POST',
+  });
+}
+
+export async function markOrderDelivered(orderId: number): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/admin/orders/${orderId}/validate-delivery`, {
+    method: 'POST',
+  });
+}
+
+// ── Admin Product list (for Add Stock modal) ────────────────────────────────
+
+export type AdminProduct = {
+  id: number;
+  name: string;
+  sku: string;
+  price: number;
+  stock_available: number;
+  warehouse: string;
+  warehouse_id: number;
+};
+
+export async function fetchAdminProducts(): Promise<AdminProduct[]> {
+  const data = await apiRequest<{ success: boolean; count: number; items: AdminProduct[] }>('/api/products');
+  return data.items;
+}
+
+// ── Step-by-step order management ────────────────────────────────────────────
+
+export async function validateDelivery(orderId: number): Promise<void> {
+  await apiRequest<{ success: boolean; message: string }>(`/admin/orders/${orderId}/validate-delivery`, {
+    method: 'POST',
+  });
+}
+
+export async function generateInvoice(orderId: number): Promise<{ invoice_id: number; invoice_number: string }> {
+  return apiRequest<{ success: boolean; invoice_id: number; invoice_number: string; message: string }>(
+    `/admin/orders/${orderId}/generate-invoice`,
+    { method: 'POST' },
+  );
 }

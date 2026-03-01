@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/lib/store';
-import { loginUser } from '@/lib/api';
+import { loginUser, demoAdminLogin } from '@/lib/api';
 import type { UserRole } from '@/lib/types';
 
 const schema = z.object({
@@ -65,6 +65,41 @@ export default function LoginPage() {
       router.push(role === 'agent' ? '/dashboard/agent' : role === 'admin' ? '/dashboard/admin' : '/dashboard/investor');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
+    }
+    setLoading(false);
+  };
+
+  const handleDemoAdminLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await demoAdminLogin();
+      setUser(
+        {
+          id: String(result.partner_id),
+          full_name: result.full_name || 'Demo Admin',
+          email: result.email || 'admin.demo@animalkart.com',
+          phone: '',
+          whatsapp_number: '',
+          address: '',
+          pan_card: '',
+          aadhaar_number: '',
+          bank_name: '',
+          account_number: '',
+          ifsc_code: '',
+          account_holder_name: '',
+          role: 'admin',
+          referral_code: '',
+          kyc_status: 'approved',
+          is_active: true,
+          registration_date: result.registration_date || new Date().toISOString(),
+          units_owned: 0,
+        },
+        result.token
+      );
+      router.push('/dashboard/admin');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Demo admin login failed');
     }
     setLoading(false);
   };
@@ -167,6 +202,20 @@ export default function LoginPage() {
               Register here
             </Link>
           </p>
+
+          <div className="mt-6 space-y-2">
+            <p className="text-xs text-gray-400 text-center">
+              Or quickly explore the admin panel with a demo account.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={handleDemoAdminLogin}
+            >
+              Continue as Demo Admin
+            </Button>
+          </div>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

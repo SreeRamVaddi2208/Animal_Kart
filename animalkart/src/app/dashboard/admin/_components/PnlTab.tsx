@@ -5,41 +5,44 @@ import { motion } from 'framer-motion';
 import { BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  useSafeAnimation,
+  fadeUpVariants,
+  staggerVariants,
+  VIEWPORT_SECTION,
+} from '@/lib/hooks/useAnimation';
 
-const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
-const stagger = { visible: { transition: { staggerChildren: 0.07 } } };
-
-const UNIT_PRICE    = 350000;
-const DIRECT_PCT    = 0.05;
-const INDIRECT_PCT  = 0.005;
-const THAR          = 2225000;
-const THAILAND      = 100000;
-const ATHER         = 164000;
+const UNIT_PRICE = 350000;
+const DIRECT_PCT = 0.05;
+const INDIRECT_PCT = 0.005;
+const THAR = 2225000;
+const THAILAND = 100000;
+const ATHER = 164000;
 
 function fmt(n: number) {
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
   if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(3)} Cr`;
-  if (abs >= 100000)   return `${sign}₹${(abs / 100000).toFixed(2)} L`;
+  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(2)} L`;
   return `${sign}₹${abs.toLocaleString('en-IN')}`;
 }
 function fmtINR(n: number) { return `₹${n.toLocaleString('en-IN')}`; }
 
 function calcPnL(units: number, costPerUnit: number) {
-  const revenue          = units * UNIT_PRICE;
-  const direct           = units * UNIT_PRICE * DIRECT_PCT;
-  const indirect         = units * UNIT_PRICE * INDIRECT_PCT;
-  const totalCommission  = direct + indirect;
-  const maxBuyers        = Math.floor(units / 100);
-  const investorReward   = maxBuyers * (THAR + THAILAND);
-  const referrerReward   = maxBuyers * ATHER;
-  const totalRewards     = investorReward + referrerReward;
-  const totalPayouts     = totalCommission + totalRewards;
-  const netRevenue       = revenue - totalPayouts;
-  const productionCost   = units * costPerUnit;
-  const profit           = netRevenue - productionCost;
-  const profitPct        = (profit / revenue) * 100;
-  const breakEven        = netRevenue / units;
+  const revenue = units * UNIT_PRICE;
+  const direct = units * UNIT_PRICE * DIRECT_PCT;
+  const indirect = units * UNIT_PRICE * INDIRECT_PCT;
+  const totalCommission = direct + indirect;
+  const maxBuyers = Math.floor(units / 100);
+  const investorReward = maxBuyers * (THAR + THAILAND);
+  const referrerReward = maxBuyers * ATHER;
+  const totalRewards = investorReward + referrerReward;
+  const totalPayouts = totalCommission + totalRewards;
+  const netRevenue = revenue - totalPayouts;
+  const productionCost = units * costPerUnit;
+  const profit = netRevenue - productionCost;
+  const profitPct = (profit / revenue) * 100;
+  const breakEven = netRevenue / units;
   return {
     revenue, direct, indirect, totalCommission,
     maxBuyers, investorReward, referrerReward, totalRewards,
@@ -48,24 +51,29 @@ function calcPnL(units: number, costPerUnit: number) {
 }
 
 const SCENARIOS = [
-  { label: '₹2 Lakh / unit',   cost: 200000, tag: '🟢 Very Safe'    },
-  { label: '₹2.5 Lakh / unit', cost: 250000, tag: '🟢 Safe'         },
-  { label: '₹3 Lakh / unit',   cost: 300000, tag: '🟡 Thin Margin'  },
-  { label: '₹3.2 Lakh / unit', cost: 320000, tag: '🔴 Loss Begins'  },
+  { label: '₹2 Lakh / unit', cost: 200000, tag: '🟢 Very Safe' },
+  { label: '₹2.5 Lakh / unit', cost: 250000, tag: '🟢 Safe' },
+  { label: '₹3 Lakh / unit', cost: 300000, tag: '🟡 Thin Margin' },
+  { label: '₹3.2 Lakh / unit', cost: 320000, tag: '🔴 Loss Begins' },
 ];
 
 export default function PnlTab() {
-  const [totalUnits,   setTotalUnits]   = useState(1500);
-  const [costPerUnit,  setCostPerUnit]  = useState(200000);
+  const [totalUnits, setTotalUnits] = useState(1500);
+  const [costPerUnit, setCostPerUnit] = useState(200000);
 
   const pnl = calcPnL(totalUnits, costPerUnit);
   const isProfit = pnl.profit >= 0;
 
+  // Reduced-motion-aware — a11y users get instant renders
+  const fadeUp = useSafeAnimation(fadeUpVariants);
+  const stagger = useSafeAnimation(staggerVariants);
+  const viewport = VIEWPORT_SECTION;
+
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
+    <motion.div initial="hidden" whileInView="visible" viewport={viewport} variants={stagger} className="space-y-6">
 
       {/* ── Calculator Inputs ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-indigo-600" /> P&amp;L Calculator
         </h2>
@@ -96,7 +104,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── Revenue Banner ── */}
-      <motion.div variants={fadeUp} className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
         <p className="text-indigo-200 text-sm mb-1">Total Revenue</p>
         <p className="text-4xl font-black">{fmt(pnl.revenue)}</p>
         <p className="text-indigo-200 text-sm mt-1">
@@ -105,7 +113,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 1. Commission Breakdown ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4">1️⃣ Direct &amp; Indirect Commission</h2>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 bg-orange-50 rounded-xl">
@@ -140,7 +148,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 2. Rewards Breakdown ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-1">2️⃣ Heavy Reward Scenario — Worst Case</h2>
         <p className="text-xs text-gray-400 mb-4">
           Every 100-unit buyer claims Thar (₹22.25L) + Thailand trip (₹1L). Referrer gets Ather e-bike (₹1.64L).
@@ -178,7 +186,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 3. Total Payouts ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4">3️⃣ Total Payouts (Worst Case)</h2>
         <div className="space-y-3">
           <div className="flex justify-between p-3 bg-gray-50 rounded-xl">
@@ -197,7 +205,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 4. Net Revenue ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4">4️⃣ Net Revenue After All Payouts</h2>
         <div className="space-y-3">
           <div className="flex justify-between p-3 bg-gray-50 rounded-xl">
@@ -219,7 +227,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 5. Break-Even ── */}
-      <motion.div variants={fadeUp} className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-6 text-white">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-6 text-white">
         <h2 className="font-bold text-white mb-3">5️⃣ Break-Even Production Cost</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white/10 rounded-xl p-4">
@@ -240,11 +248,13 @@ export default function PnlTab() {
       {/* ── 6. Current Scenario Result ── */}
       <motion.div
         variants={fadeUp}
-        className={`rounded-2xl p-6 border ${
-          isProfit
-            ? 'bg-green-50 border-green-200'
-            : 'bg-red-50 border-red-200'
-        }`}
+        initial="hidden"
+        whileInView="visible"
+        viewport={viewport}
+        className={`rounded-2xl p-6 border ${isProfit
+          ? 'bg-green-50 border-green-200'
+          : 'bg-red-50 border-red-200'
+          }`}
       >
         <div className="flex items-center gap-3 mb-4">
           {isProfit
@@ -270,7 +280,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── 7. Scenario Table ── */}
-      <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4">📊 Profit / Loss Scenarios ({totalUnits.toLocaleString()} units)</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -307,7 +317,7 @@ export default function PnlTab() {
       </motion.div>
 
       {/* ── Final Summary ── */}
-      <motion.div variants={fadeUp} className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-6 text-white">
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden" className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-6 text-white">
         <h2 className="font-bold text-lg mb-4">🔥 Final Summary</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white/10 rounded-xl p-4">

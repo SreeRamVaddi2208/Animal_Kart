@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -63,7 +63,7 @@ const BANK_OPTIONS = [
   'Andhra Bank',
 ];
 
-export default function RegisterPage() {
+function RegisterContent() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -163,9 +163,8 @@ export default function RegisterPage() {
             const done = step > s.id;
             return (
               <div key={s.id} className="flex items-center">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  done ? 'bg-green-100 text-green-700' : active ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'
-                }`}>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${done ? 'bg-green-100 text-green-700' : active ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'
+                  }`}>
                   {done ? <CheckCircle className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                   <span className="hidden sm:block">{s.label}</span>
                 </div>
@@ -194,9 +193,8 @@ export default function RegisterPage() {
                           key={role}
                           type="button"
                           onClick={() => { setSelectedRole(role); setValue('role', role); }}
-                          className={`p-4 rounded-xl border-2 text-left transition-all ${
-                            selectedRole === role ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                          className={`p-4 rounded-xl border-2 text-left transition-all ${selectedRole === role ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}
                         >
                           <div className="text-2xl mb-1">{role === 'investor' ? '🧑‍💼' : '🤝'}</div>
                           <div className="font-semibold text-gray-900 capitalize">{role}</div>
@@ -367,5 +365,13 @@ export default function RegisterPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>}>
+      <RegisterContent />
+    </Suspense>
   );
 }
