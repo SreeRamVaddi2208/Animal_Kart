@@ -2,171 +2,124 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, FileText, Warehouse, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
-import Navbar from '@/components/layout/Navbar';
+import { ShoppingCart, FileText, Warehouse, RefreshCw, Wallet, Users, Gift } from 'lucide-react';
+import DashboardShell, { DashCard } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
 import { fetchHoldings, type LiveHoldings } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
-import {
-  useSafeAnimation,
-  fadeUpVariants,
-  staggerVariants,
-  VIEWPORT_SECTION,
-  VIEWPORT_CARD,
-} from '@/lib/hooks/useAnimation';
 
 export default function InvestorDashboard() {
   const { user } = useAuthStore();
   const [holdings, setHoldings] = useState<LiveHoldings | null>(null);
-  const [loadingHoldings, setLoadingHoldings] = useState(true);
-  const [holdingsError, setHoldingsError] = useState<string | null>(null);
-
-  // Reduced-motion-aware — a11y users get instant renders
-  const fadeUp = useSafeAnimation(fadeUpVariants);
-  const stagger = useSafeAnimation(staggerVariants);
-  const viewport = VIEWPORT_SECTION;
-  const cardViewport = VIEWPORT_CARD;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      if (!user?.email) {
-        setLoadingHoldings(false);
-        setHoldingsError('Please login with your registered Odoo email to see your holdings.');
-        return;
-      }
-      try {
-        setLoadingHoldings(true);
-        setHoldingsError(null);
-        const data = await fetchHoldings(user.email);
-        setHoldings(data);
-      } catch (err) {
-        setHoldingsError(err instanceof Error ? err.message : 'Failed to load holdings');
-      } finally {
-        setLoadingHoldings(false);
-      }
-    };
-    load();
+    if (!user?.email) { setLoading(false); setError('Please login to see your holdings.'); return; }
+    setLoading(true);
+    fetchHoldings(user.email)
+      .then(setHoldings)
+      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load holdings'))
+      .finally(() => setLoading(false));
   }, [user?.email]);
 
+  const quickLinks = [
+    { href: '/warehouses', label: 'Buy Units', icon: ShoppingCart, color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+    { href: '/dashboard/investor/wallet', label: 'My Wallet', icon: Wallet, color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+    { href: '/dashboard/investor/referrals', label: 'Referrals', icon: Users, color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
+    { href: '/dashboard/investor/rewards', label: 'Rewards', icon: Gift, color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+    { href: '/dashboard/investor/invoices', label: 'Invoices', icon: FileText, color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-
-        {/* ── Welcome Card ── */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={fadeUp}
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"
-        >
-          <h1 className="text-2xl font-bold text-gray-900">Welcome, {user?.full_name || 'Investor'}</h1>
-          <p className="text-gray-500 mt-2">
-            This dashboard is now running without demo/mock data. Orders and invoices are fetched live from Odoo.
-          </p>
-
-          {/* Action buttons — staggered scroll reveal */}
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={viewport}
-            variants={stagger}
-            className="mt-6 flex flex-wrap gap-3"
-          >
-            {[
-              { href: '/warehouses', label: 'Buy Units', icon: ShoppingCart, primary: true },
-              { href: '/dashboard/investor/orders', label: 'Live Orders', icon: null, primary: false },
-              { href: '/dashboard/investor/invoices', label: 'Live Invoices', icon: FileText, primary: false },
-            ].map((item) => (
-              <motion.div key={item.href} variants={fadeUp}>
-                <Link
-                  href={item.href}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${item.primary
-                      ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm hover:shadow-md'
-                      : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                >
-                  {item.icon && <item.icon className="h-4 w-4" />}
-                  {item.label}
-                </Link>
-              </motion.div>
-            ))}
-          </motion.div>
-        </motion.div>
-
-        {/* ── Unit Holdings Section ── */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={fadeUp}
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"
-        >
-          <div className="flex items-center justify-between gap-4 flex-wrap mb-5">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Your Unit Holdings</h2>
-              <p className="text-sm text-gray-500">Total units you own and their distribution across warehouses.</p>
-            </div>
-            <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-4 py-2">
-              <Warehouse className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-xs text-gray-500">Total Units</p>
-                <p className="text-lg font-bold text-green-700">
-                  {holdings ? formatNumber(holdings.total_units) : loadingHoldings ? '—' : '0'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* States */}
-          {loadingHoldings ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Loading holdings from Odoo…
-            </div>
-          ) : holdingsError ? (
-            <p className="text-sm text-red-600">{holdingsError}</p>
-          ) : !holdings || holdings.per_warehouse.length === 0 ? (
-            <p className="text-sm text-gray-500">No unit purchases found yet.</p>
-          ) : (
-            /*
-              Warehouse cards — each staggered child reveals on scroll.
-              cardViewport (amount: 0.08) fires earlier than sections
-              so cards feel like they push up from below the fold.
-            */
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={cardViewport}
-              variants={stagger}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {holdings.per_warehouse.map((row) => (
-                <motion.div
-                  key={`${row.warehouse_id ?? 'na'}-${row.warehouse_name ?? 'unknown'}`}
-                  variants={fadeUp}
-                  className="border border-gray-100 rounded-xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow"
-                >
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Warehouse</p>
-                    <p className="font-semibold text-gray-900">
-                      {row.warehouse_name || 'Warehouse N/A'}
-                    </p>
-                  </div>
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-400 mb-0.5">Units Owned</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {formatNumber(row.units)}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </motion.div>
-
+    <DashboardShell>
+      {/* Page header */}
+      <div className="mb-8">
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'white', marginBottom: 4 }}>
+          Welcome back, <span style={{ color: '#34d399' }}>{user?.full_name || 'Investor'}</span>
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>
+          Live data synced from Odoo — all values reflect real-time activity.
+        </p>
       </div>
-    </div>
+
+      {/* Quick nav cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        {quickLinks.map(link => {
+          const Icon = link.icon;
+          return (
+            <Link key={link.href} href={link.href} style={{ textDecoration: 'none' }}>
+              <div
+                className="ak-glass ak-glass-hover"
+                style={{ padding: '18px 14px', borderRadius: 16, textAlign: 'center', cursor: 'pointer' }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: link.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: link.color, margin: '0 auto 10px' }}>
+                  <Icon size={20} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{link.label}</div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* KPI row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <DashCard
+          label="Total Units Owned"
+          value={holdings ? formatNumber(holdings.total_units) : null}
+          icon={<Warehouse size={18} />}
+          loading={loading}
+        />
+        <DashCard
+          label="Farm Locations"
+          value={holdings ? holdings.per_warehouse.length : null}
+          icon={<Warehouse size={18} />}
+          iconColor="#60a5fa"
+          loading={loading}
+        />
+        <DashCard
+          label="Status"
+          value={user?.kyc_status ? user.kyc_status.charAt(0).toUpperCase() + user.kyc_status.slice(1) : 'Unknown'}
+          icon={<RefreshCw size={18} />}
+          iconColor={user?.kyc_status === 'approved' ? '#34d399' : '#fbbf24'}
+          loading={false}
+        />
+      </div>
+
+      {/* Holdings section */}
+      <div className="ak-glass" style={{ borderRadius: 18, padding: '24px 24px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700 }}>Unit Holdings by Warehouse</h2>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>Distribution of your units across farm locations</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.4)', padding: '12px 0' }}>
+            <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading from Odoo…
+          </div>
+        ) : error ? (
+          <p style={{ fontSize: 13, color: '#f87171', padding: '12px 0' }}>{error}</p>
+        ) : !holdings || holdings.per_warehouse.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', padding: '12px 0' }}>No unit purchases found yet. <Link href="/warehouses" style={{ color: '#34d399' }}>Browse warehouses →</Link></p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {holdings.per_warehouse.map(row => (
+              <div
+                key={`${row.warehouse_id}-${row.warehouse_name}`}
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(52,211,153,0.12)', borderRadius: 14, padding: '16px' }}
+              >
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Warehouse</p>
+                <p style={{ fontWeight: 700, fontSize: 15, color: 'white', marginBottom: 10 }}>{row.warehouse_name || 'N/A'}</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Units Owned</p>
+                <p style={{ fontSize: 24, fontWeight: 800, color: '#34d399' }}>{formatNumber(row.units)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </DashboardShell>
   );
 }

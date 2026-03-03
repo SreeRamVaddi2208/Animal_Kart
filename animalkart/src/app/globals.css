@@ -120,6 +120,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -127,10 +128,274 @@
 
 /* ── Accessibility: Respect prefers-reduced-motion ── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===============================================================
+   PREMIUM LANDING PAGE — ANIMATIONS & UTILITY CLASSES
+   =============================================================== */
+
+@keyframes ak-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ak-float-a {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-40px) scale(1.05);
+  }
+}
+
+@keyframes ak-float-b {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(35px) scale(0.96);
+  }
+}
+
+@keyframes ak-float-c {
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-22px) rotate(15deg);
+  }
+}
+
+@keyframes ak-scroll-bounce {
+
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  50% {
+    transform: translateX(-50%) translateY(12px);
+  }
+}
+
+@keyframes ak-pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 14px rgba(52, 211, 153, 0);
+  }
+}
+
+@keyframes ak-rotate-slow {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes ak-rotate-slow-rev {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}
+
+@keyframes ak-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ak-number-pop {
+  0% {
+    transform: scale(0.75);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hero Background */
+.ak-hero-bg {
+  background: linear-gradient(-45deg, #021a0e, #0d3320, #043020, #062a1a, #071f15);
+  background-size: 400% 400%;
+  animation: ak-gradient-shift 16s ease infinite;
+}
+
+/* Grid overlay */
+.ak-grid-bg {
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Floating blobs */
+.ak-blob-a {
+  animation: ak-float-a 7s ease-in-out infinite;
+}
+
+.ak-blob-b {
+  animation: ak-float-b 9s ease-in-out infinite;
+}
+
+.ak-blob-c {
+  animation: ak-float-c 11s ease-in-out infinite;
+}
+
+/* Scroll bounce arrow */
+.ak-scroll-bounce {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: ak-scroll-bounce 2.2s ease-in-out infinite;
+}
+
+/* Glassmorphism card */
+.ak-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+.ak-glass-hover {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ak-glass-hover:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(52, 211, 153, 0.12);
+}
+
+/* Pulse border */
+.ak-pulse-border {
+  animation: ak-pulse-glow 3s ease-in-out infinite;
+}
+
+/* Shimmer text */
+.ak-shimmer-text {
+  background: linear-gradient(90deg, #34d399 0%, #6ee7b7 30%, #a7f3d0 50%, #6ee7b7 70%, #34d399 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: ak-shimmer 4s linear infinite;
+}
+
+/* Orbital rings */
+.ak-ring-1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 680px;
+  height: 680px;
+  border-radius: 50%;
+  border: 1px solid rgba(52, 211, 153, 0.07);
+  animation: ak-rotate-slow 40s linear infinite;
+  pointer-events: none;
+}
+
+.ak-ring-2 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  border: 1px solid rgba(52, 211, 153, 0.05);
+  animation: ak-rotate-slow-rev 25s linear infinite;
+  pointer-events: none;
+}
+
+/* Primary CTA button shimmer sweep */
+.ak-btn-primary {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.ak-btn-primary:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 12px 40px rgba(52, 211, 153, 0.4);
+}
+
+.ak-btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.15), transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+
+.ak-btn-primary:hover::after {
+  transform: translateX(100%);
+}
+
+/* Number pop entrance */
+.ak-number-pop {
+  animation: ak-number-pop 0.9s ease both;
+}
+
+/* Spin (for loading spinners) */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }

@@ -1,24 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowLeft, Package, MapPin, FileText, Download } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import Navbar from '@/components/layout/Navbar';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { fetchOrders, type LiveOrder } from '@/lib/api';
+import { Package, RefreshCw, MapPin, FileText } from 'lucide-react';
+import DashboardShell, { DashCard, StatusBadge } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
-
-const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
-const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
-
-const statusColors: Record<string, string> = {
-  confirmed: 'bg-green-100 text-green-700',
-  draft: 'bg-amber-100 text-amber-700',
-  cancelled: 'bg-red-100 text-red-700',
-};
+import { fetchOrders, type LiveOrder } from '@/lib/api';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function OrdersPage() {
   const { user } = useAuthStore();
@@ -27,92 +15,77 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        if (!user?.id) {
-          throw new Error('Please login to view orders.');
-        }
-        const customerId = Number(user.id);
-        if (!Number.isFinite(customerId) || customerId <= 0) {
-          throw new Error('Invalid customer profile. Please login again.');
-        }
-        const data = await fetchOrders(customerId);
-        setOrders(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    if (!user?.id) { setLoading(false); setError('Please login to view orders.'); return; }
+    const customerId = Number(user.id);
+    if (!Number.isFinite(customerId) || customerId <= 0) {
+      setLoading(false); setError('Invalid customer profile. Please login again.'); return;
+    }
+    setLoading(true);
+    fetchOrders(customerId)
+      .then(setOrders)
+      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load orders'))
+      .finally(() => setLoading(false));
   }, [user?.id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="mb-6">
-          <Link href="/dashboard/investor" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-4">
-            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Purchase History</h1>
-          <p className="text-gray-500 mt-1">All your unit purchases</p>
-        </motion.div>
-
-        <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-4">
-          {loading && <p className="text-sm text-gray-500">Loading live Odoo orders...</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {!loading && orders.length === 0 && <p className="text-sm text-gray-500">No Odoo orders found for this email.</p>}
-
-          {orders.map(order => {
-            return (
-              <motion.div key={order.order_id} variants={fadeUp}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Package className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-gray-900">{order.order_reference}</h3>
-                        <Badge className={`text-xs ${statusColors[order.status] || 'bg-gray-100 text-gray-600'}`}>
-                          {order.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-500 text-sm mt-1">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>{order.warehouse_name || 'Warehouse N/A'}</span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {formatDate(order.created_at)} · {order.payment_method.replace('_', ' ')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Order #{order.order_id}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <FileText className="w-4 h-4 text-green-500" />
-                    <span>Invoice available in Invoices tab</span>
-                  </div>
-                  <Link href="/dashboard/investor/invoices">
-                    <Button size="sm" variant="outline" className="text-xs h-8">
-                      <Download className="w-3.5 h-3.5 mr-1" /> View Invoices
-                    </Button>
-                  </Link>
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+    <DashboardShell>
+      <div className="mb-8">
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'white', marginBottom: 4 }}>Purchase History</h1>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>All your unit purchase orders from Odoo.</p>
       </div>
-    </div>
+
+      {/* KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <DashCard label="Total Orders" value={loading ? null : orders.length} icon={<Package size={18} />} loading={loading} />
+        <DashCard label="Total Invested" value={loading ? null : formatCurrency(orders.reduce((s, o) => s + o.total_amount, 0))} icon={<Package size={18} />} iconColor="#60a5fa" loading={loading} />
+      </div>
+
+      {loading ? (
+        <div className="ak-glass" style={{ padding: 24, borderRadius: 16, display: 'flex', gap: 8, color: 'rgba(255,255,255,0.4)', fontSize: 14, alignItems: 'center' }}>
+          <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading orders from Odoo…
+        </div>
+      ) : error ? (
+        <div className="ak-glass" style={{ padding: 24, borderRadius: 16, color: '#f87171', fontSize: 14 }}>{error}</div>
+      ) : orders.length === 0 ? (
+        <div className="ak-glass" style={{ padding: 24, borderRadius: 16, fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>
+          No purchase orders found. <Link href="/warehouses" style={{ color: '#34d399' }}>Browse available units →</Link>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {orders.map(order => (
+            <div key={order.order_id} className="ak-glass" style={{ borderRadius: 16, padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div style={{ width: 44, height: 44, background: 'rgba(52,211,153,0.1)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Package size={20} style={{ color: '#34d399' }} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: 'white' }}>{order.order_reference}</span>
+                      <StatusBadge status={order.status} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                      <MapPin size={11} /> <span>{order.warehouse_name || 'Warehouse N/A'}</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>
+                      {order.created_at ? formatDate(order.created_at) : '—'} · {order.payment_method?.replace('_', ' ') || '—'}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 20, fontWeight: 800, color: '#34d399' }}>{formatCurrency(order.total_amount)}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>Order #{order.order_id}</p>
+                </div>
+              </div>
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Link href="/dashboard/investor/invoices" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#34d399', textDecoration: 'none', fontWeight: 500 }}>
+                  <FileText size={13} /> View Invoice
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </DashboardShell>
   );
 }

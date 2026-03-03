@@ -1,30 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   ShieldCheck, Users, CreditCard, Warehouse, BarChart3,
-  IndianRupee, Package,
+  IndianRupee, Package, RefreshCw,
 } from 'lucide-react';
-import Navbar from '@/components/layout/Navbar';
+import DashboardShell, { DashCard } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
 import { fetchAdminUsers, fetchAdminInvoices, fetchAdminDashboardSummary } from '@/lib/api';
-import {
-  useSafeAnimation,
-  fadeUpVariants,
-  staggerVariants,
-  VIEWPORT_SECTION,
-} from '@/lib/hooks/useAnimation';
 import KycTab from './_components/KycTab';
 import PaymentsTab from './_components/PaymentsTab';
 import WarehousesTab from './_components/WarehousesTab';
 import PnlTab from './_components/PnlTab';
 
-
 type Tab = 'kyc' | 'payments' | 'warehouses' | 'pnl';
-
-const UNIT_PRICE = 350000;
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuthStore();
@@ -35,149 +25,92 @@ export default function AdminDashboard() {
   const [unitsSold, setUnitsSold] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalCapacity, setTotalCapacity] = useState(0);
-
-  // Reduced-motion-aware animation variants — no animation for a11y users
-  const fadeUp = useSafeAnimation(fadeUpVariants);
-  const stagger = useSafeAnimation(staggerVariants);
-  const viewport = VIEWPORT_SECTION;
+  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
-      router.replace('/');
-    }
+    if (isAuthenticated && user?.role !== 'admin') router.replace('/');
   }, [isAuthenticated, user, router]);
 
   useEffect(() => {
-
-    const loadCounts = async () => {
-      try {
-        const [users, invoices, summary] = await Promise.all([
-          fetchAdminUsers(),
-          fetchAdminInvoices(),
-          fetchAdminDashboardSummary(),
-        ]);
+    setLoadingStats(true);
+    Promise.all([fetchAdminUsers(), fetchAdminInvoices(), fetchAdminDashboardSummary()])
+      .then(([users, invoices, summary]) => {
         setPendingKyc(users.filter(u => (u.kyc_status || 'pending') === 'pending').length);
-        setPendingPayments(
-          invoices.filter(inv => (inv.payment_state || '').toLowerCase() !== 'paid').length,
-        );
+        setPendingPayments(invoices.filter(inv => (inv.payment_state || '').toLowerCase() !== 'paid').length);
         setUnitsSold(summary.units_sold || 0);
         setTotalRevenue(summary.total_revenue || 0);
         setTotalCapacity(summary.total_capacity || 0);
-      } catch {
-        // leave counts at 0 on error
-      }
-    };
-    loadCounts();
+      })
+      .catch(() => { })
+      .finally(() => setLoadingStats(false));
   }, []);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
+  const TABS: { key: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'kyc', label: 'KYC Approvals', icon: Users, badge: pendingKyc },
     { key: 'payments', label: 'Payment Approvals', icon: CreditCard, badge: pendingPayments },
-    { key: 'warehouses', label: 'Warehouse Management', icon: Warehouse },
+    { key: 'warehouses', label: 'Warehouse Mgmt', icon: Warehouse },
     { key: 'pnl', label: 'Profit & Loss', icon: BarChart3 },
   ];
 
-  const summaryCards = [
-    { label: 'Pending KYC', value: String(pendingKyc), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Pending Payments', value: String(pendingPayments), icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Units Sold', value: unitsSold.toLocaleString(), icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Total Revenue', value: `₹${(totalRevenue / 10000000).toFixed(2)} Cr`, icon: IndianRupee, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Total Capacity', value: totalCapacity.toLocaleString() + ' units', icon: Warehouse, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <DashboardShell>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 32 }}>
+        <div style={{ width: 52, height: 52, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(99,102,241,0.3)' }}>
+          <ShieldCheck size={26} color="white" />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'white' }}>Admin Panel</h1>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>AnimalKart Operations Dashboard — Live Odoo Data</p>
+        </div>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* KPI Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <DashCard label="Pending KYC" value={pendingKyc} icon={<Users size={16} />} iconColor="#fbbf24" loading={loadingStats} />
+        <DashCard label="Pending Payments" value={pendingPayments} icon={<CreditCard size={16} />} iconColor="#60a5fa" loading={loadingStats} />
+        <DashCard label="Units Sold" value={unitsSold.toLocaleString()} icon={<Package size={16} />} iconColor="#34d399" loading={loadingStats} />
+        <DashCard label="Total Revenue" value={`₹${(totalRevenue / 10000000).toFixed(2)} Cr`} icon={<IndianRupee size={16} />} iconColor="#c084fc" loading={loadingStats} />
+        <DashCard label="Total Capacity" value={`${totalCapacity.toLocaleString()} units`} icon={<Warehouse size={16} />} iconColor="#6ee7b7" loading={loadingStats} />
+      </div>
 
-        {/* ── Header ── */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={fadeUp}
-          className="mb-8"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center shadow-lg">
-              <ShieldCheck className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-              <p className="text-sm text-gray-500">AnimalKart Operations Dashboard</p>
-            </div>
-          </div>
-        </motion.div>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+        {TABS.map(t => {
+          const Icon = t.icon;
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 14, fontSize: 13, fontWeight: active ? 700 : 500, cursor: 'pointer',
+                color: active ? '#34d399' : 'rgba(255,255,255,0.5)',
+                background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)',
+                border: active ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Icon size={15} />
+              {t.label}
+              {t.badge !== undefined && t.badge > 0 && (
+                <span style={{ background: active ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.2)', color: active ? '#34d399' : '#fbbf24', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 100 }}>
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* ── Summary Cards ── */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={stagger}
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8"
-        >
-          {summaryCards.map((card, i) => {
-            const Icon = card.icon;
-            return (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
-              >
-                <div className={`w-9 h-9 ${card.bg} rounded-xl flex items-center justify-center mb-3`}>
-                  <Icon className={`w-5 h-5 ${card.color}`} />
-                </div>
-                <p className="text-xl font-bold text-gray-900">{card.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{card.label}</p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-
-        {/* ── Tab Bar ── */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={fadeUp}
-          className="flex gap-2 flex-wrap mb-6"
-        >
-          {tabs.map(t => {
-            const Icon = t.icon;
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${active
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
-                  }`}
-              >
-                <Icon className="w-4 h-4" />
-                {t.label}
-                {t.badge !== undefined && t.badge > 0 && (
-                  <span
-                    className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
-                      }`}
-                  >
-                    {t.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </motion.div>
-
-        {/* ── Tab Content ── */}
+      {/* Tab content — sub-components render their own content */}
+      <div style={{ background: 'transparent' }}>
         {tab === 'kyc' && <KycTab />}
         {tab === 'payments' && <PaymentsTab />}
         {tab === 'warehouses' && <WarehousesTab />}
         {tab === 'pnl' && <PnlTab />}
-
       </div>
-    </div>
+    </DashboardShell>
   );
 }

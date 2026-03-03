@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, Bell, ShoppingCart, User, LogOut,
@@ -20,10 +20,21 @@ import { getInitials } from '@/lib/utils';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { items } = useCartStore();
+
+  const isLanding = pathname === '/';
+
+  useEffect(() => {
+    if (!isLanding) return;
+    const fn = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', fn, { passive: true });
+    fn();
+    return () => window.removeEventListener('scroll', fn);
+  }, [isLanding]);
 
   const unreadNotifications = 0;
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -56,21 +67,53 @@ export default function Navbar() {
 
   const navLinks = user?.role === 'agent' ? agentLinks : user?.role === 'admin' ? adminLinks : investorLinks;
 
+  /* Nav appearance: dark glass on landing hero, solid light elsewhere */
+  const darkMode = isLanding;
+  const navBg = darkMode
+    ? scrolled
+      ? 'rgba(6,20,15,0.92)'
+      : 'rgba(0,0,0,0.15)'
+    : 'rgba(255,255,255,0.97)';
+  const navBorder = darkMode
+    ? scrolled
+      ? '1px solid rgba(52,211,153,0.25)'
+      : '1px solid rgba(255,255,255,0.08)'
+    : '1px solid rgba(52,211,153,0.12)';
+  const textColor = darkMode ? 'rgba(255,255,255,0.8)' : '#374151';
+  const logoColor = darkMode ? '#34d399' : '#16a34a';
+  const logoTextColor = darkMode ? 'white' : '#111827';
+
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <nav
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        background: navBg,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: navBorder,
+        boxShadow: scrolled && darkMode ? '0 8px 32px rgba(0,0,0,0.4)' : 'none',
+        transition: 'all 0.4s ease',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-sm">AK</span>
+            <div
+              style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#34d399,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(52,211,153,0.3)', flexShrink: 0 }}
+            >
+              <span style={{ color: 'white', fontWeight: 800, fontSize: 13 }}>AK</span>
             </div>
-            <span className="font-bold text-xl text-gray-900">
-              Animal<span className="text-green-600">Kart</span>
+            <span style={{ fontWeight: 800, fontSize: 20, color: logoTextColor }}>
+              Animal<span style={{ color: logoColor }}>Kart</span>
             </span>
           </Link>
 
-          {/* Desktop Nav Links (authenticated) */}
+          {/* Desktop auth nav links */}
           {isAuthenticated && (
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map(link => {
@@ -80,13 +123,21 @@ export default function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      active
-                        ? 'bg-green-50 text-green-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 10, fontSize: 14, fontWeight: 500,
+                      transition: 'all 0.2s',
+                      color: active ? '#34d399' : textColor,
+                      background: active ? 'rgba(52,211,153,0.1)' : 'transparent',
+                    }}
+                    onMouseEnter={e => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = darkMode ? 'rgba(255,255,255,0.07)' : '#f9fafb';
+                    }}
+                    onMouseLeave={e => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon size={15} />
                     {link.label}
                   </Link>
                 );
@@ -94,73 +145,73 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* Public Nav Links */}
+          {/* Public nav links */}
           {!isAuthenticated && (
             <div className="hidden md:flex items-center gap-6">
-              <Link href="/#how-it-works" className="text-sm text-gray-600 hover:text-gray-900 font-medium">How it Works</Link>
-              <Link href="/#warehouses" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Warehouses</Link>
-              <Link href="/#rewards" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Rewards</Link>
+              {['/#how-it-works', '/#warehouses', '/#rewards'].map((href, i) => {
+                const labels = ['How It Works', 'Warehouses', 'Rewards'];
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    style={{ fontSize: 14, fontWeight: 500, color: textColor, transition: 'color 0.2s', textDecoration: 'none' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#34d399'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = textColor; }}
+                  >
+                    {labels[i]}
+                  </Link>
+                );
+              })}
             </div>
           )}
 
-          {/* Right Side */}
+          {/* Right side */}
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                {/* Cart */}
                 <Link href="/cart">
-                  <Button variant="ghost" size="icon" className="relative">
-                    <ShoppingCart className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="relative" style={{ color: textColor }}>
+                    <ShoppingCart size={19} />
                     {cartCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-green-600">
-                        {cartCount}
-                      </Badge>
+                      <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-green-600">{cartCount}</Badge>
                     )}
                   </Button>
                 </Link>
 
-                {/* Notifications */}
                 <Link href="/notifications">
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="relative" style={{ color: textColor }}>
+                    <Bell size={19} />
                     {unreadNotifications > 0 && (
-                      <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-red-500">
-                        {unreadNotifications}
-                      </Badge>
+                      <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-red-500">{unreadNotifications}</Badge>
                     )}
                   </Button>
                 </Link>
 
-                {/* User Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center gap-2 px-2">
+                    <Button variant="ghost" className="flex items-center gap-2 px-2" style={{ color: textColor }}>
                       <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-green-100 text-green-700 text-xs font-semibold">
+                        <AvatarFallback className="bg-green-600/20 text-green-400 text-xs font-semibold">
                           {user ? getInitials(user.full_name) : 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                      <span className="hidden sm:block text-sm font-medium max-w-[100px] truncate">
                         {user?.full_name}
                       </span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
-                      <div>
-                        <p className="font-semibold">{user?.full_name}</p>
-                        <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
-                      </div>
+                      <p className="font-semibold">{user?.full_name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center gap-2">
-                        <User className="w-4 h-4" /> Profile
-                      </Link>
+                      <Link href="/profile" className="flex items-center gap-2"><User size={15} /> Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="text-red-600 flex items-center gap-2">
-                      <LogOut className="w-4 h-4" /> Logout
+                      <LogOut size={15} /> Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -168,24 +219,52 @@ export default function Navbar() {
             ) : (
               <div className="flex items-center gap-2">
                 <Link href="/auth/login">
-                  <Button variant="ghost" size="sm">Login</Button>
+                  <button
+                    style={{
+                      background: 'transparent',
+                      border: darkMode ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(52,211,153,0.3)',
+                      color: darkMode ? 'rgba(255,255,255,0.8)' : '#16a34a',
+                      borderRadius: 10,
+                      padding: '7px 18px',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    Login
+                  </button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                  <button
+                    style={{
+                      background: 'linear-gradient(135deg,#34d399,#059669)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 10,
+                      padding: '7px 18px',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(52,211,153,0.3)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
                     Get Started
-                  </Button>
+                  </button>
                 </Link>
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
+            {/* Mobile toggle */}
             <Button
               variant="ghost"
               size="icon"
               className="md:hidden"
+              style={{ color: textColor }}
               onClick={() => setMobileOpen(!mobileOpen)}
             >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </Button>
           </div>
         </div>
@@ -198,7 +277,8 @@ export default function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-gray-100 bg-white"
+            className="md:hidden"
+            style={{ borderTop: navBorder, background: darkMode ? 'rgba(4,15,9,0.97)' : 'white', backdropFilter: 'blur(20px)' }}
           >
             <div className="px-4 py-3 space-y-1">
               {isAuthenticated ? (
@@ -210,30 +290,34 @@ export default function Navbar() {
                         key={link.href}
                         href={link.href}
                         onClick={() => setMobileOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, fontSize: 14, fontWeight: 500, color: textColor, textDecoration: 'none' }}
                       >
-                        <Icon className="w-4 h-4" /> {link.label}
+                        <Icon size={16} /> {link.label}
                       </Link>
                     );
                   })}
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 w-full"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#f87171', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%' }}
                   >
-                    <LogOut className="w-4 h-4" /> Logout
+                    <LogOut size={16} /> Logout
                   </button>
                 </>
               ) : (
                 <>
-                  <Link href="/#how-it-works" onClick={() => setMobileOpen(false)} className="block px-3 py-2.5 text-sm text-gray-700">How it Works</Link>
-                  <Link href="/#warehouses" onClick={() => setMobileOpen(false)} className="block px-3 py-2.5 text-sm text-gray-700">Warehouses</Link>
-                  <Link href="/#rewards" onClick={() => setMobileOpen(false)} className="block px-3 py-2.5 text-sm text-gray-700">Rewards</Link>
+                  {[['/#how-it-works', 'How It Works'], ['/#warehouses', 'Warehouses'], ['/#rewards', 'Rewards']].map(([href, label]) => (
+                    <Link key={href} href={href} onClick={() => setMobileOpen(false)}
+                      style={{ display: 'block', padding: '10px 12px', fontSize: 14, fontWeight: 500, color: textColor, textDecoration: 'none' }}
+                    >
+                      {label}
+                    </Link>
+                  ))}
                   <div className="pt-2 flex flex-col gap-2">
                     <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
-                      <Button variant="outline" className="w-full">Login</Button>
+                      <button style={{ width: '100%', background: 'transparent', border: '1px solid rgba(52,211,153,0.3)', color: darkMode ? 'white' : '#16a34a', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Login</button>
                     </Link>
                     <Link href="/auth/register" onClick={() => setMobileOpen(false)}>
-                      <Button className="w-full bg-green-600 hover:bg-green-700">Get Started</Button>
+                      <button style={{ width: '100%', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', border: 'none', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Get Started</button>
                     </Link>
                   </div>
                 </>
