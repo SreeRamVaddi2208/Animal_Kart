@@ -14,18 +14,7 @@ export const metadata: Metadata = {
   keywords: "livestock investment, buffalo, calf, Andhra Pradesh, AnimalKart",
 };
 
-/**
- * SmoothScrollProvider wrapped with next/dynamic + ssr:false.
- *
- * WHY: Lenis accesses `window` — a browser-only API. If we import it
- * directly in this Server Component, Next.js will try to run it server-side
- * and throw. `ssr: false` ensures it only ever runs in the browser, preventing
- * hydration mismatches and server crashes.
- */
-const SmoothScrollProvider = dynamic(
-  () => import("@/components/SmoothScrollProvider"),
-  { ssr: false }
-);
+import BodyWrapper from "@/components/BodyWrapper";
 
 export default function RootLayout({
   children,
@@ -36,13 +25,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} antialiased`}>
         {/*
-          SmoothScrollProvider activates Lenis (buttery smooth scroll)
-          + syncs it with GSAP's ticker for ScrollTrigger compatibility.
-          Rendered client-side only — zero impact on SSR/hydration.
+          BodyWrapper handles the client-only smooth scroll
+          initialisation via dynamic import with ssr:false.
         */}
-        <SmoothScrollProvider>
+        <BodyWrapper>
           {children}
-        </SmoothScrollProvider>
+        </BodyWrapper>
       </body>
     </html>
   );
