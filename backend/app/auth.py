@@ -9,13 +9,17 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
+from dotenv import load_dotenv
+
 # ── JWT Configuration ────────────────────────────────────────────────
+
+load_dotenv()
 
 security = HTTPBearer()
 
-SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
+SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "5d3f33ae6b57de10888d403c542e765f9f75be0ba7b794d6c1cdfd48529995f5")
 ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "120"))
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "525600"))
 
 
 # ── Token helpers ────────────────────────────────────────────────────
