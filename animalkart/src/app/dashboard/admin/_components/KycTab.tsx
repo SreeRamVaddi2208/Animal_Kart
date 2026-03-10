@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
@@ -9,6 +10,8 @@ import {
 } from 'lucide-react';
 import type { KycStatus } from './types';
 import { fetchAdminUsers, updateKycStatus } from '@/lib/api';
+import { exportCSV } from '@/lib/utils';
+import { usePolling, useTimeSince } from '@/lib/hooks/usePolling';
 import {
   useSafeAnimation,
   fadeUpVariants,
@@ -51,12 +54,15 @@ function DetailRow({ icon: Icon, label, value }: { icon: React.ElementType; labe
   );
 }
 
-export default function KycTab() {
+function KycTabInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [list, setList] = useState<ExtendedUser[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [filter, setFilter] = useState<KycStatus | 'all'>('all');
   const [acting, setActing] = useState<string | null>(null);
 
@@ -65,7 +71,7 @@ export default function KycTab() {
   const viewport = VIEWPORT_SECTION;
   const cardViewport = VIEWPORT_CARD;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
       const users = await fetchAdminUsers();
@@ -79,9 +85,18 @@ export default function KycTab() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load KYC records');
     } finally { setLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  const { lastUpdated, refresh } = usePolling(load, 60_000);
+  const timeSince = useTimeSince(lastUpdated);
+
+  /* Sync search to URL */
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('search', val); else params.delete('search');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
 
   const setStatus = async (id: string, next: KycStatus) => {
     const record = list.find(k => k.id === id);
@@ -149,7 +164,7 @@ export default function KycTab() {
           <input
             placeholder="Search by name or email…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             style={{
               width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
               borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`,
@@ -158,12 +173,29 @@ export default function KycTab() {
           />
         </div>
         <button
-          onClick={load}
+          onClick={refresh}
           style={{ padding: 10, borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer', color: TEXT_MID, display: 'flex', alignItems: 'center' }}
           title="Refresh"
         >
           <RefreshCw style={{ width: 15, height: 15, ...(loading ? { animation: 'spin 1s linear infinite' } : {}) }} />
         </button>
+        {filtered.length > 0 && (
+          <button
+            onClick={() => exportCSV('kyc_records.csv', filtered.map(u => ({
+              'Partner ID': u.id, 'Name': u.name, 'Email': u.email, 'Role': u.role,
+              'KYC Status': u.kyc_status, 'Submitted': u.submitted,
+            })))}
+            style={{ fontSize: 12, padding: '8px 14px', borderRadius: 12, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', cursor: 'pointer', color: '#60a5fa', fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            ↓ Export CSV
+          </button>
+        )}
+        {lastUpdated && (
+          <span style={{ fontSize: 11, color: TEXT_DIM, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', marginLeft: 'auto' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 4px #34d399' }} />
+            {timeSince}
+          </span>
+        )}
       </motion.div>
 
       {/* ── States ── */}
@@ -322,5 +354,13 @@ export default function KycTab() {
         })}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+export default function KycTab() {
+  return (
+    <Suspense fallback={null}>
+      <KycTabInner />
+    </Suspense>
   );
 }

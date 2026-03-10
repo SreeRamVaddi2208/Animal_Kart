@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle, XCircle, Clock, Eye, CreditCard, RefreshCw,
@@ -21,6 +22,8 @@ import {
   VIEWPORT_SECTION,
   VIEWPORT_CARD,
 } from '@/lib/hooks/useAnimation';
+import { exportCSV } from '@/lib/utils';
+import { usePolling, useTimeSince } from '@/lib/hooks/usePolling';
 
 /* ── Dark palette constants ── */
 const CARD = 'rgba(255,255,255,0.04)';
@@ -110,12 +113,15 @@ function OrderModal({ order, invoice, onClose }: { order: AdminOrder; invoice?: 
 }
 
 /* ── Main ── */
-export default function PaymentsTab() {
+function PaymentsTabInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [filterState, setFilterState] = useState<string>('all');
   const [expanded, setExpanded] = useState<number | null>(null);
   const [acting, setActing] = useState<{ id: number; action: string } | null>(null);
@@ -129,15 +135,24 @@ export default function PaymentsTab() {
 
   const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
       const [ord, inv] = await Promise.all([fetchAdminOrders(), fetchAdminInvoices()]);
       setOrders(ord); setInvoices(inv);
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load orders'); }
     finally { setLoading(false); }
+  }, []);
+
+  const { lastUpdated, refresh } = usePolling(load, 60_000);
+  const timeSince = useTimeSince(lastUpdated);
+
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('search', val); else params.delete('search');
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
-  useEffect(() => { load(); }, []);
 
   const invoiceByOrderRef = useMemo(() => {
     const m = new Map<string, AdminInvoice>();
@@ -259,13 +274,31 @@ export default function PaymentsTab() {
           <div style={{ position: 'relative', minWidth: 192 }}>
             <Search style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: TEXT_DIM }} />
             <input
-              value={search} onChange={e => setSearch(e.target.value)} placeholder="Search orders…"
+              value={search} onChange={e => handleSearch(e.target.value)} placeholder="Search orders…"
               style={{ width: '100%', paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 10, background: CARD, border: `1px solid ${CARD_BORDER}`, color: 'white', fontSize: 12, outline: 'none' }}
             />
           </div>
-          <button onClick={load} style={{ padding: 9, borderRadius: 10, background: CARD, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer', color: TEXT_MID, display: 'flex', alignItems: 'center' }}>
+          <button onClick={refresh} style={{ padding: 9, borderRadius: 10, background: CARD, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer', color: TEXT_MID, display: 'flex', alignItems: 'center' }}>
             <RefreshCw style={{ width: 14, height: 14, ...(loading ? { animation: 'spin 1s linear infinite' } : {}) }} />
           </button>
+          {filtered.length > 0 && (
+            <button
+              onClick={() => exportCSV('payments.csv', filtered.map(o => ({
+                'Order Ref': o.order_number, 'Customer': o.customer_name,
+                'Amount (₹)': o.total_amount, 'Status': o.status,
+                'Date': o.created_at?.slice(0, 10) ?? '',
+              })))}
+              style={{ fontSize: 12, padding: '7px 13px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', cursor: 'pointer', color: '#60a5fa', fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              ↓ CSV
+            </button>
+          )}
+          {lastUpdated && (
+            <span style={{ fontSize: 11, color: TEXT_DIM, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', marginLeft: 'auto' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 4px #34d399' }} />
+              {timeSince}
+            </span>
+          )}
         </div>
       </motion.div>
 
@@ -410,4 +443,12 @@ function btnStyle(bg: string, color: string, border: string, disabled?: boolean 
     cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
     background: bg, color, border: `1px solid ${border}`, opacity: disabled ? 0.5 : 1,
   };
+}
+
+export default function PaymentsTab() {
+  return (
+    <Suspense fallback={null}>
+      <PaymentsTabInner />
+    </Suspense>
+  );
 }

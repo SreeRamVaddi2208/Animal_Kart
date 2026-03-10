@@ -1,88 +1,192 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { ArrowLeft, Bell, Package, Coins, Gift, ArrowRightLeft, CheckCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Bell, Package, Coins, Gift, ArrowRightLeft, CheckCheck,
+  ShieldCheck, ShieldAlert, Clock, Wallet,
+} from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
+import { useAuthStore } from '@/lib/store';
+import { fetchWallet, fetchRewards } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
-import type { Notification } from '@/lib/types';
 
-const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
-const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
+const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
+const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.06 } } };
 
-const typeConfig: Record<Notification['type'], { icon: React.ElementType; color: string; bg: string }> = {
-  purchase: { icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
-  payment: { icon: Coins, color: 'text-blue-600', bg: 'bg-blue-50' },
-  commission: { icon: Coins, color: 'text-amber-600', bg: 'bg-amber-50' },
-  reward: { icon: Gift, color: 'text-purple-600', bg: 'bg-purple-50' },
-  transfer: { icon: ArrowRightLeft, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  general: { icon: Bell, color: 'text-gray-600', bg: 'bg-gray-50' },
+type NotifType = 'kyc' | 'wallet' | 'purchase' | 'reward' | 'transfer' | 'general';
+
+interface LocalNotif {
+  id: string;
+  title: string;
+  message: string;
+  type: NotifType;
+  read: boolean;
+  date: string;
+}
+
+const TYPE_CFG: Record<NotifType, { icon: React.ElementType; color: string; bg: string }> = {
+  kyc: { icon: ShieldCheck, color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  wallet: { icon: Wallet, color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  purchase: { icon: Package, color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  reward: { icon: Gift, color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+  transfer: { icon: ArrowRightLeft, color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
+  general: { icon: Bell, color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.06)' },
 };
 
-export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const unreadCount = notifications.filter(n => !n.read).length;
+/* Build smart notifications from available Odoo data */
+function buildNotifications(
+  user: { full_name?: string; kyc_status?: string; registration_date?: string } | null,
+  walletBalance: number,
+  hasWalletData: boolean,
+  rewardsMilestone: boolean,
+): LocalNotif[] {
+  const notes: LocalNotif[] = [];
+  const now = new Date().toISOString();
+  const regDate = user?.registration_date ?? now;
 
-  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  const markRead = (id: string) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  /* KYC event */
+  if (user?.kyc_status === 'approved') {
+    notes.push({ id: 'kyc-approved', title: 'KYC Approved ✓', message: 'Your KYC has been verified. You can now purchase units and earn commissions.', type: 'kyc', read: false, date: regDate });
+  } else if (user?.kyc_status === 'pending') {
+    notes.push({ id: 'kyc-pending', title: 'KYC Under Review', message: 'Your KYC documents are being reviewed by our team. You\'ll be notified once approved.', type: 'kyc', read: false, date: regDate });
+  } else if (user?.kyc_status === 'rejected') {
+    notes.push({ id: 'kyc-rejected', title: 'KYC Rejected', message: 'Your KYC was rejected. Please contact support to re-submit your documents.', type: 'kyc', read: false, date: regDate });
+  }
+
+  /* Wallet balance */
+  if (hasWalletData && walletBalance > 0) {
+    notes.push({ id: 'wallet-balance', title: 'Wallet Balance Updated', message: `Your wallet has ${walletBalance.toLocaleString('en-IN')} coins. 1 Coin = ₹1.`, type: 'wallet', read: true, date: now });
+  }
+
+  if (hasWalletData && walletBalance >= 350000) {
+    notes.push({ id: 'wallet-free-unit', title: '🎉 Eligible for Free Unit!', message: 'Your wallet balance has reached ₹3,50,000. You can purchase a unit using coins — no cash needed!', type: 'wallet', read: false, date: now });
+  }
+
+  /* Reward milestone */
+  if (rewardsMilestone) {
+    notes.push({ id: 'reward-milestone', title: 'Reward Milestone Unlocked!', message: 'You\'ve reached a reward milestone. Visit the Rewards page to check your eligibility.', type: 'reward', read: false, date: now });
+  }
+
+  /* Welcome */
+  notes.push({ id: 'welcome', title: `Welcome to AnimalKart, ${user?.full_name?.split(' ')[0] ?? 'there'}!`, message: 'Your account has been created. Complete your KYC to start investing in premium farm units.', type: 'general', read: true, date: regDate });
+
+  return notes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export default function NotificationsPage() {
+  const { user } = useAuthStore();
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [hasWalletData, setHasWalletData] = useState(false);
+  const [rewardsMilestone, setRewardsMilestone] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user?.email) { setLoading(false); return; }
+    Promise.allSettled([
+      fetchWallet(user.email),
+      fetchRewards(user.email),
+    ]).then(([walletRes, rewardRes]) => {
+      if (walletRes.status === 'fulfilled') {
+        setWalletBalance(walletRes.value.balance);
+        setHasWalletData(true);
+      }
+      if (rewardRes.status === 'fulfilled') {
+        setRewardsMilestone(rewardRes.value.total_units >= 30);
+      }
+    }).finally(() => setLoading(false));
+  }, [user?.email]);
+
+  const notifications = useMemo(
+    () => buildNotifications(user, walletBalance, hasWalletData, rewardsMilestone),
+    [user, walletBalance, hasWalletData, rewardsMilestone]
+  );
+
+  const unreadCount = notifications.filter(n => !n.read && !readIds.has(n.id)).length;
+
+  const markRead = (id: string) => setReadIds(prev => new Set([...prev, id]));
+  const markAllRead = () => setReadIds(new Set(notifications.map(n => n.id)));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#030d07', color: 'white' }}>
       <Navbar />
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="mb-6">
-          <button onClick={() => window.history.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-4">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-          <div className="flex items-center justify-between">
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '88px 24px 48px' }}>
+        {/* Header */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Bell className="w-6 h-6 text-gray-700" /> Notifications
-              </h1>
-              {unreadCount > 0 && (
-                <p className="text-gray-500 mt-1 text-sm">{unreadCount} unread notification{unreadCount > 1 ? 's' : ''}</p>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 38, height: 38, background: 'rgba(52,211,153,0.12)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bell size={18} style={{ color: '#34d399' }} />
+                </div>
+                <h1 style={{ fontSize: 26, fontWeight: 800, color: 'white' }}>Notifications</h1>
+                {unreadCount > 0 && (
+                  <span style={{ background: '#34d399', color: '#030d07', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 99 }}>
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Activity feed from your account events</p>
             </div>
             {unreadCount > 0 && (
-              <Button variant="outline" size="sm" onClick={markAllRead} className="flex items-center gap-1.5">
-                <CheckCheck className="w-4 h-4" /> Mark all read
-              </Button>
+              <button
+                onClick={markAllRead}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, color: '#34d399', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+              >
+                <CheckCheck size={15} /> Mark all read
+              </button>
             )}
           </div>
         </motion.div>
 
-        {notifications.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
-            <Bell className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-500">No notifications yet</p>
+        {/* Loading */}
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} className="ak-glass" style={{ borderRadius: 16, height: 80 }}>
+                <div className="shimmer" style={{ height: '100%', borderRadius: 16 }} />
+              </div>
+            ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '72px 0' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔔</div>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>No notifications yet</p>
           </motion.div>
         ) : (
-          <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-3">
+          <motion.div initial="hidden" animate="visible" variants={stagger} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {notifications.map(notif => {
-              const config = typeConfig[notif.type];
-              const Icon = config.icon;
+              const isRead = notif.read || readIds.has(notif.id);
+              const cfg = TYPE_CFG[notif.type];
+              const Icon = cfg.icon;
               return (
                 <motion.div
                   key={notif.id}
                   variants={fadeUp}
                   onClick={() => markRead(notif.id)}
-                  className={`bg-white rounded-2xl border shadow-sm p-4 cursor-pointer transition-all hover:shadow-md ${notif.read ? 'border-gray-100' : 'border-green-200'}`}
+                  style={{
+                    background: isRead ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${isRead ? 'rgba(255,255,255,0.07)' : 'rgba(52,211,153,0.2)'}`,
+                    borderRadius: 16, padding: '16px 20px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'flex-start', gap: 14,
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                  }}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 ${config.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                      <Icon className={`w-5 h-5 ${config.color}`} />
+                  {/* Icon */}
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={18} style={{ color: cfg.color }} />
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <p style={{ fontWeight: isRead ? 500 : 700, color: isRead ? 'rgba(255,255,255,0.7)' : 'white', fontSize: 14 }}>{notif.title}</p>
+                      {!isRead && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', flexShrink: 0, marginTop: 4, boxShadow: '0 0 6px #34d399' }} />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={`font-semibold text-sm ${notif.read ? 'text-gray-700' : 'text-gray-900'}`}>{notif.title}</p>
-                        {!notif.read && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex-shrink-0 mt-1" />}
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1 leading-relaxed">{notif.message}</p>
-                      <p className="text-gray-400 text-xs mt-2">{formatDateTime(notif.date)}</p>
-                    </div>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 4, lineHeight: 1.6 }}>{notif.message}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 6 }}>{formatDateTime(notif.date)}</p>
                   </div>
                 </motion.div>
               );

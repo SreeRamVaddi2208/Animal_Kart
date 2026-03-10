@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Warehouse, Plus, Pencil, Trash2, ChevronDown, ChevronUp,
@@ -13,7 +14,8 @@ import {
   fetchAdminWarehouseStock, addAdminWarehouseStock, fetchAdminProducts,
   type AdminWarehouse, type AdminWarehouseStock, type AdminProduct,
 } from '@/lib/api';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, exportCSV } from '@/lib/utils';
+import { usePolling, useTimeSince } from '@/lib/hooks/usePolling';
 import {
   useSafeAnimation, fadeUpVariants, staggerFastVariants, VIEWPORT_SECTION, VIEWPORT_CARD,
 } from '@/lib/hooks/useAnimation';
@@ -257,12 +259,15 @@ function StockDrawer({ warehouse, onClose }: { warehouse: WarehouseRow; onClose:
 }
 
 /* ── Main Component ── */
-export default function WarehousesTab() {
+function WarehousesTabInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<WarehouseRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WarehouseRow | null>(null);
@@ -278,7 +283,7 @@ export default function WarehousesTab() {
 
   const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
       const [whMeta, stock, sales] = await Promise.all([fetchAdminWarehouses(), fetchWarehouseStock(), fetchAdminWarehouseSales()]);
@@ -289,8 +294,17 @@ export default function WarehousesTab() {
       setWarehouses(Array.from(byId.values()));
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load warehouses'); }
     finally { setLoading(false); }
+  }, []);
+
+  const { lastUpdated, refresh } = usePolling(load, 60_000);
+  const timeSince = useTimeSince(lastUpdated);
+
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('search', val); else params.delete('search');
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
-  useEffect(() => { load(); }, []);
 
   const handleCreate = async (name: string, code: string) => { const created = await createAdminWarehouse({ name, code }); setWarehouses(prev => [...prev, { ...created, available: 0, sold: 0, total: 0 }]); showToast(`Warehouse "${name}" created!`); };
   const handleEdit = async (name: string, code: string) => { if (!editTarget) return; await updateAdminWarehouse(editTarget.id, { name, code }); setWarehouses(prev => prev.map(w => w.id === editTarget.id ? { ...w, name, code } : w)); showToast(`Warehouse updated!`); };
@@ -339,11 +353,18 @@ export default function WarehousesTab() {
       <motion.div variants={fadeUp} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
           <Search style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: TEXT_DIM }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search warehouses…" style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9, borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`, color: 'white', fontSize: 13, outline: 'none' }} />
+          <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Search warehouses…" style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9, borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`, color: 'white', fontSize: 13, outline: 'none' }} />
         </div>
-        <button onClick={load} style={{ padding: 10, borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer', color: TEXT_MID, display: 'flex', alignItems: 'center' }} title="Refresh">
+        <button onClick={refresh} style={{ padding: 10, borderRadius: 12, background: CARD, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer', color: TEXT_MID, display: 'flex', alignItems: 'center' }} title="Refresh">
           <RefreshCw style={{ width: 14, height: 14, ...(loading ? { animation: 'spin 1s linear infinite' } : {}) }} />
         </button>
+        <button onClick={() => exportCSV('warehouses.csv', warehouses.map(w => ({ 'ID': w.id, 'Name': w.name, 'Code': w.code, 'Total': w.total, 'Sold': w.sold, 'Available': w.available })))} style={{ fontSize: 12, padding: '7px 13px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', cursor: 'pointer', color: '#60a5fa', fontWeight: 600, whiteSpace: 'nowrap' }}>↓ CSV</button>
+        {lastUpdated && (
+          <span style={{ fontSize: 11, color: TEXT_DIM, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', marginLeft: 'auto' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 4px #34d399' }} />
+            {timeSince}
+          </span>
+        )}
         <button onClick={() => setShowCreate(true)} style={{ ...btnStyle('rgba(52,211,153,0.12)', '#34d399', 'rgba(52,211,153,0.3)'), marginLeft: 'auto', padding: '9px 16px', fontSize: 13 }}>
           <Plus style={{ width: 14, height: 14 }} /> Add Warehouse
         </button>
@@ -471,5 +492,13 @@ export default function WarehousesTab() {
         {addStockTarget && <AddStockModal warehouse={addStockTarget} onClose={() => setAddStockTarget(null)} onSuccess={handleAddStockSuccess} />}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+export default function WarehousesTab() {
+  return (
+    <Suspense fallback={null}>
+      <WarehousesTabInner />
+    </Suspense>
   );
 }

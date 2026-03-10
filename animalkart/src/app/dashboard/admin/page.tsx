@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShieldCheck, Users, CreditCard, Warehouse, BarChart3,
-  IndianRupee, Package, RefreshCw,
+  IndianRupee, Package,
 } from 'lucide-react';
 import DashboardShell, { DashCard } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
@@ -15,11 +15,17 @@ import WarehousesTab from './_components/WarehousesTab';
 import PnlTab from './_components/PnlTab';
 
 type Tab = 'kyc' | 'payments' | 'warehouses' | 'pnl';
+const VALID_TABS: Tab[] = ['kyc', 'payments', 'warehouses', 'pnl'];
 
-export default function AdminDashboard() {
+function AdminDashboardInner() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('kyc');
+  const searchParams = useSearchParams();
+
+  const paramTab = searchParams.get('tab') as Tab | null;
+  const initialTab: Tab = paramTab && VALID_TABS.includes(paramTab) ? paramTab : 'kyc';
+
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [pendingKyc, setPendingKyc] = useState(0);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unitsSold, setUnitsSold] = useState(0);
@@ -44,6 +50,14 @@ export default function AdminDashboard() {
       .catch(() => { })
       .finally(() => setLoadingStats(false));
   }, []);
+
+  /* Persist tab to URL on change */
+  const handleTabChange = (next: Tab) => {
+    setTab(next);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', next);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
 
   const TABS: { key: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'kyc', label: 'KYC Approvals', icon: Users, badge: pendingKyc },
@@ -82,7 +96,7 @@ export default function AdminDashboard() {
           return (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => handleTabChange(t.key)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 18px', borderRadius: 14, fontSize: 13, fontWeight: active ? 700 : 500, cursor: 'pointer',
@@ -112,5 +126,13 @@ export default function AdminDashboard() {
         {tab === 'pnl' && <PnlTab />}
       </div>
     </DashboardShell>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={null}>
+      <AdminDashboardInner />
+    </Suspense>
   );
 }

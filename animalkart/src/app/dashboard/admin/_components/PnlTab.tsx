@@ -9,6 +9,7 @@ import {
 import {
   useSafeAnimation, fadeUpVariants, staggerVariants, VIEWPORT_SECTION,
 } from '@/lib/hooks/useAnimation';
+import { exportCSV } from '@/lib/utils';
 
 /* ── Dark palette ── */
 const CARD = 'rgba(255,255,255,0.04)';
@@ -127,6 +128,24 @@ export default function PnlTab() {
             {totalUnits.toLocaleString()} units × {fmtINR(UNIT_PRICE)}
           </p>
         </div>
+      </motion.div>
+
+      {/* ── Export Button ── */}
+      <motion.div variants={fadeUp}>
+        <button
+          onClick={() => exportCSV('pnl_report.csv', [
+            { 'Metric': 'Total Units', 'Value': totalUnits },
+            { 'Metric': 'Revenue', 'Value': pnl.revenue },
+            { 'Metric': 'Direct Commission', 'Value': pnl.direct },
+            { 'Metric': 'Indirect Commission', 'Value': pnl.indirect },
+            { 'Metric': 'Total Rewards', 'Value': pnl.totalRewards },
+            { 'Metric': 'Production Cost', 'Value': pnl.productionCost },
+            { 'Metric': 'Net Profit', 'Value': pnl.profit },
+          ])}
+          style={{ fontSize: 12, padding: '8px 16px', borderRadius: 12, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', cursor: 'pointer', color: '#60a5fa', fontWeight: 600 }}
+        >
+          ↓ Export P&amp;L as CSV
+        </button>
       </motion.div>
 
       {/* ── Donut Chart ── */}
