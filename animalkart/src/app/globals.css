@@ -334,6 +334,17 @@
   animation: ak-shimmer 4s linear infinite;
 }
 
+/* Skeleton shimmer placeholder */
+.shimmer {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.10) 40%,
+      rgba(255, 255, 255, 0.04) 60%);
+  background-size: 200% 100%;
+  animation: ak-shimmer 1.6s ease-in-out infinite;
+  border-radius: inherit;
+}
+
 /* Orbital rings */
 .ak-ring-1 {
   position: absolute;

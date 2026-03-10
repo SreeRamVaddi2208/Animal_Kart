@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
 import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import {
   useSafeAnimation, fadeUpVariants, staggerVariants, VIEWPORT_SECTION,
 } from '@/lib/hooks/useAnimation';
 
@@ -124,6 +127,67 @@ export default function PnlTab() {
             {totalUnits.toLocaleString()} units × {fmtINR(UNIT_PRICE)}
           </p>
         </div>
+      </motion.div>
+
+      {/* ── Donut Chart ── */}
+      <motion.div variants={fadeUp} viewport={viewport} whileInView="visible" initial="hidden">
+        <DarkCard>
+          <h2 style={{ fontWeight: 800, color: 'white', marginBottom: 4, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <BarChart3 style={{ width: 16, height: 16, color: '#c084fc' }} /> Revenue Split
+          </h2>
+          <p style={{ fontSize: 11, color: TEXT_DIM, marginBottom: 20 }}>Visual breakdown for {totalUnits.toLocaleString()} units — worst-case payouts</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Net Revenue', value: Math.max(pnl.netRevenue - pnl.productionCost, 0) },
+                    { name: 'Commission', value: pnl.totalCommission },
+                    { name: 'Rewards', value: pnl.totalRewards },
+                    { name: 'Prod. Cost', value: pnl.productionCost },
+                  ]}
+                  cx="50%" cy="50%"
+                  innerRadius={60} outerRadius={92}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  <Cell fill="#34d399" />
+                  <Cell fill="#fbbf24" />
+                  <Cell fill="#c084fc" />
+                  <Cell fill="#60a5fa" />
+                </Pie>
+                <Tooltip
+                  formatter={(val: number | undefined) => (val !== undefined ? fmt(val) : '')}
+                  contentStyle={{
+                    background: 'rgba(10,20,15,0.97)', border: '1px solid rgba(52,211,153,0.2)',
+                    borderRadius: 10, fontSize: 12,
+                  }}
+                  itemStyle={{ color: 'white' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.5)' }}
+                />
+                <Legend
+                  iconType="circle" iconSize={8}
+                  formatter={(value: string) => <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Summary rows under chart */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginTop: 4 }}>
+              {[
+                { label: 'Net Company Revenue', value: fmt(Math.max(pnl.netRevenue - pnl.productionCost, 0)), color: '#34d399' },
+                { label: 'Commission Paid Out', value: fmt(pnl.totalCommission), color: '#fbbf24' },
+                { label: 'Rewards Cost', value: fmt(pnl.totalRewards), color: '#c084fc' },
+                { label: 'Production Cost', value: fmt(pnl.productionCost), color: '#60a5fa' },
+              ].map((item, i) => (
+                <div key={i} style={{ background: `${item.color}0a`, border: `1px solid ${item.color}22`, borderRadius: 10, padding: '10px 12px' }}>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>{item.label}</p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: item.color }}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DarkCard>
       </motion.div>
 
       {/* ── 1. Commission Breakdown ── */}

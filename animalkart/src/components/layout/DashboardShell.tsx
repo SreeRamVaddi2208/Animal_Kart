@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import Navbar from './Navbar';
+import AnimatedCounter from '@/components/ui/AnimatedCounter';
 import {
     LayoutDashboard, Wallet, Users, Gift, FileText, ShoppingBag,
     ArrowRightLeft, ShieldCheck, Warehouse, BarChart3, CreditCard, Bell,
@@ -211,7 +212,13 @@ export function DashCard({
                 </div>
             )}
             <div style={{ fontSize: 24, fontWeight: 800, color: iconColor, lineHeight: 1 }}>
-                {loading ? '—' : value !== null && value !== undefined ? `${value}${suffix}` : '—'}
+                {loading
+                    ? '—'
+                    : value !== null && value !== undefined
+                        ? typeof value === 'number'
+                            ? <AnimatedCounter end={value} suffix={suffix} />
+                            : `${value}${suffix}`
+                        : '—'}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 5 }}>{label}</div>
         </div>
