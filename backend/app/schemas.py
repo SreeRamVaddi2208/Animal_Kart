@@ -31,6 +31,7 @@ class AuthResponse(BaseModel):
     success: bool
     message: str
     token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     partner_id: int
     full_name: str | None = None
@@ -49,6 +50,17 @@ class AuthResponse(BaseModel):
     kyc_status: str = "pending"
     registration_date: str | None = None
     units_owned: float = 0.0
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    success: bool
+    token: str
+    refresh_token: str
+    token_type: str = "bearer"
 
 
 class ProductItem(BaseModel):
@@ -554,3 +566,30 @@ class KYCListResponse(BaseModel):
     success: bool
     count: int
     items: list[KYCPartnerItem]
+
+
+# ── Audit Log Schemas ────────────────────────────────────────────────
+
+class AuditLogItem(BaseModel):
+    id: int
+    admin_email: str
+    action: str
+    target_type: str
+    target_id: str
+    details: dict | None = None
+    timestamp: str
+
+
+class AuditLogResponse(BaseModel):
+    success: bool
+    count: int
+    items: list[AuditLogItem]
+
+
+# ── Webhook Schemas ──────────────────────────────────────────────────
+
+class OdooWebhookPayload(BaseModel):
+    event: str  # e.g. "payment.confirmed", "stock.updated", "partner.updated"
+    model: str | None = None
+    record_id: int | None = None
+    data: dict | None = None

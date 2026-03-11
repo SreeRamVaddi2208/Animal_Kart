@@ -5,8 +5,10 @@ import type { User, CartItem } from './types';
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setUser: (user: User, token: string) => void;
+  setUser: (user: User, token: string, refreshToken?: string) => void;
+  setTokens: (token: string, refreshToken: string) => void;
   logout: () => void;
 }
 
@@ -24,9 +26,13 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
-      setUser: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      setUser: (user, token, refreshToken) =>
+        set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true }),
+      setTokens: (token, refreshToken) => set({ token, refreshToken }),
+      logout: () =>
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
     }),
     { name: 'animalkart-auth' }
   )

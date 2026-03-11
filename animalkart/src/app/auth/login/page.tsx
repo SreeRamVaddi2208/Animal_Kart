@@ -60,7 +60,8 @@ export default function LoginPage() {
           registration_date: result.registration_date || new Date().toISOString(),
           units_owned: result.units_owned || 0,
         },
-        result.token
+        result.token,
+        result.refresh_token ?? undefined
       );
       router.push(role === 'agent' ? '/dashboard/agent' : role === 'admin' ? '/dashboard/admin' : '/dashboard/investor');
     } catch (err) {
@@ -95,7 +96,8 @@ export default function LoginPage() {
           registration_date: result.registration_date || new Date().toISOString(),
           units_owned: 0,
         },
-        result.token
+        result.token,
+        result.refresh_token ?? undefined
       );
       router.push('/dashboard/admin');
     } catch (err) {

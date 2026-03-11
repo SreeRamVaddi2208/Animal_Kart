@@ -1,20 +1,30 @@
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .auth import (
     create_access_token,
+    create_refresh_token,
+    verify_refresh_token,
     get_current_user,
     require_admin,
     require_agent,
     require_investor,
 )
+from .audit import log_action
 from .config import settings
 from .db import init_db, get_db
-from .models import OrderStatus, OrderStatusEnum, UserKyc, KycStatusEnum
+from .email_service import send_kyc_approved, send_kyc_rejected, send_payment_confirmed
+from .models import AuditLog, OrderStatus, OrderStatusEnum, UserKyc, KycStatusEnum
 from .odoo_service import OdooService
 from .schemas import (
     AdminActionResponse,
@@ -44,6 +54,8 @@ from .schemas import (
     ApiOrderCreateResponse,
     ApiOrdersResponse,
     ApiProductsResponse,
+    AuditLogItem,
+    AuditLogResponse,
     AuthResponse,
     CheckoutRequest,
     CheckoutResponse,
@@ -57,9 +69,12 @@ from .schemas import (
     KYCListResponse,
     KYCPartnerItem,
     LoginRequest,
+    OdooWebhookPayload,
     OrdersResponse,
     ProductsResponse,
     ReferralsResponse,
+    RefreshRequest,
+    RefreshResponse,
     RegisterPaymentRequest,
     RegisterRequest,
     RewardsResponse,
@@ -75,7 +90,15 @@ from .schemas import (
     WarehouseUpdateRequest,
 )
 
+logger = logging.getLogger(__name__)
+
+# ── Rate limiter ─────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="AnimalKart Backend", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 init_db()
 
 app.add_middleware(
@@ -93,22 +116,24 @@ def health() -> HealthResponse:
 
 
 @app.post("/auth/register", response_model=AuthResponse)
-def register(payload: RegisterRequest) -> AuthResponse:
+@limiter.limit("5/minute")
+def register(request: Request, payload: RegisterRequest) -> AuthResponse:
     try:
         service = OdooService()
         partner_id, created = service.register_partner(payload.model_dump())
-        token = create_access_token(
-            {
+        token_data = {
                 "sub": payload.email,
                 "role": payload.role,
                 "partner_id": partner_id,
                 "kyc_status": "pending",
             }
-        )
+        token = create_access_token(token_data)
+        refresh = create_refresh_token(token_data)
         return AuthResponse(
             success=True,
             message="Registered in Odoo" if created else "User already exists in Odoo",
             token=token,
+            refresh_token=refresh,
             token_type="bearer",
             partner_id=partner_id,
             full_name=payload.full_name,
@@ -133,7 +158,8 @@ def register(payload: RegisterRequest) -> AuthResponse:
 
 
 @app.post("/auth/login", response_model=AuthResponse)
-def login(payload: LoginRequest) -> AuthResponse:
+@limiter.limit("5/minute")
+def login(request: Request, payload: LoginRequest) -> AuthResponse:
     try:
         service = OdooService()
         partner = service.find_partner_by_email(payload.email)
@@ -143,18 +169,19 @@ def login(payload: LoginRequest) -> AuthResponse:
         role = service.extract_role_from_partner(partner)
         kyc_status = service.extract_kyc_status(partner)
         profile = service.extract_profile_from_partner(partner)
-        token = create_access_token(
-            {
+        token_data = {
                 "sub": payload.email,
                 "role": role,
                 "partner_id": partner_id,
                 "kyc_status": kyc_status,
             }
-        )
+        token = create_access_token(token_data)
+        refresh = create_refresh_token(token_data)
         return AuthResponse(
             success=True,
             message="Login synced with Odoo partner",
             token=token,
+            refresh_token=refresh,
             token_type="bearer",
             partner_id=partner_id,
             full_name=str(partner.get("name") or ""),
@@ -181,7 +208,8 @@ def login(payload: LoginRequest) -> AuthResponse:
 
 
 @app.post("/admin/login", response_model=AuthResponse)
-def admin_login(payload: LoginRequest) -> AuthResponse:
+@limiter.limit("5/minute")
+def admin_login(request: Request, payload: LoginRequest) -> AuthResponse:
     try:
         service = OdooService()
         partner = service.find_partner_by_email(payload.email)
@@ -193,18 +221,19 @@ def admin_login(payload: LoginRequest) -> AuthResponse:
         partner_id = int(partner["id"])
         kyc_status = service.extract_kyc_status(partner)
         profile = service.extract_profile_from_partner(partner)
-        token = create_access_token(
-            {
+        token_data = {
                 "sub": payload.email,
                 "role": "admin",
                 "partner_id": partner_id,
                 "kyc_status": kyc_status,
             }
-        )
+        token = create_access_token(token_data)
+        refresh = create_refresh_token(token_data)
         return AuthResponse(
             success=True,
             message="Admin login synced with Odoo partner",
             token=token,
+            refresh_token=refresh,
             token_type="bearer",
             partner_id=partner_id,
             full_name=str(partner.get("name") or ""),
@@ -228,6 +257,29 @@ def admin_login(payload: LoginRequest) -> AuthResponse:
         raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/auth/refresh", response_model=RefreshResponse)
+def refresh_tokens(payload: RefreshRequest) -> RefreshResponse:
+    """Exchange a valid refresh token for a new access + refresh pair (rotation)."""
+    old = verify_refresh_token(payload.refresh_token)
+    service = OdooService()
+    partner = service.find_partner_by_email(str(old.get("sub", "")))
+    if not partner:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    role = service.extract_role_from_partner(partner)
+    kyc_status = service.extract_kyc_status(partner)
+    token_data = {
+        "sub": old["sub"],
+        "role": role,
+        "partner_id": int(partner["id"]),
+        "kyc_status": kyc_status,
+    }
+    return RefreshResponse(
+        success=True,
+        token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
+    )
 
 
 @app.post("/auth/demo-admin", response_model=AuthResponse)
@@ -639,7 +691,8 @@ def admin_order_detail(order_id: int, user: dict = Depends(require_admin)) -> Ad
 
 
 @app.post("/admin/orders/{order_id}/approve", response_model=AdminActionResponse)
-def admin_approve_order(order_id: int, db=Depends(get_db), user: dict = Depends(require_admin)) -> AdminActionResponse:
+@limiter.limit("10/minute")
+def admin_approve_order(request: Request, order_id: int, db=Depends(get_db), user: dict = Depends(require_admin)) -> AdminActionResponse:
     try:
         OdooService().confirm_sale_order(order_id)
         order_status = (
@@ -653,6 +706,7 @@ def admin_approve_order(order_id: int, db=Depends(get_db), user: dict = Depends(
         else:
             order_status.status = OrderStatusEnum.APPROVED
         db.commit()
+        log_action(db, admin_email=user.get("sub", ""), action="approve_order", target_type="order", target_id=order_id)
         return AdminActionResponse(success=True, message="Sale order confirmed in Odoo")
     except HTTPException:
         raise
@@ -751,7 +805,9 @@ def admin_post_invoice(invoice_id: int, user: dict = Depends(require_admin)) -> 
 
 
 @app.post("/admin/invoices/{invoice_id}/register-payment", response_model=AdminActionResponse)
+@limiter.limit("10/minute")
 def admin_register_payment(
+    request: Request,
     invoice_id: int,
     payload: RegisterPaymentRequest,
     db=Depends(get_db),
@@ -773,6 +829,14 @@ def admin_register_payment(
         if order_status is not None:
             order_status.status = OrderStatusEnum.PAID
             db.commit()
+
+        # Audit + email
+        log_action(db, admin_email=user.get("sub", ""), action="register_payment", target_type="invoice", target_id=invoice_id, details={"amount": payload.amount})
+        try:
+            send_payment_confirmed(user.get("sub", ""), user.get("sub", ""), payload.amount)
+        except Exception:
+            logger.warning("Payment email failed", exc_info=True)
+
         return AdminActionResponse(success=True, message="Payment registered in Odoo")
     except HTTPException:
         raise
@@ -802,7 +866,8 @@ def api_admin_invoice_pay(invoice_id: int, user: dict = Depends(require_admin)) 
 
 
 @app.put("/admin/users/{partner_id}/verify", response_model=AdminActionResponse)
-def admin_verify_user(partner_id: int, payload: KycUpdateRequest, db=Depends(get_db), user: dict = Depends(require_admin)) -> AdminActionResponse:
+@limiter.limit("10/minute")
+def admin_verify_user(request: Request, partner_id: int, payload: KycUpdateRequest, db=Depends(get_db), user: dict = Depends(require_admin)) -> AdminActionResponse:
     try:
         status_value = payload.status.lower()
         if status_value not in {KycStatusEnum.PENDING, KycStatusEnum.APPROVED, KycStatusEnum.REJECTED}:
@@ -850,6 +915,17 @@ def admin_verify_user(partner_id: int, payload: KycUpdateRequest, db=Depends(get
                 "write",
                 [[int(partner["id"])], {"comment": new_comment}],
             )
+
+        # Audit + email
+        log_action(db, admin_email=user.get("sub", ""), action=f"kyc_{status_value}", target_type="kyc", target_id=partner_id, details={"email": str(payload.email)})
+        partner_name = str(partner.get("name", "")) if partner else str(payload.email)
+        try:
+            if status_value == KycStatusEnum.APPROVED:
+                send_kyc_approved(str(payload.email), partner_name)
+            elif status_value == KycStatusEnum.REJECTED:
+                send_kyc_rejected(str(payload.email), partner_name)
+        except Exception:
+            logger.warning("KYC email failed", exc_info=True)
 
         return AdminActionResponse(success=True, message=f"KYC status updated to {status_value}")
     except HTTPException:
@@ -1152,3 +1228,63 @@ def api_admin_kyc_all(user: dict = Depends(require_admin)) -> KYCListResponse:
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ── Audit Log ─────────────────────────────────────────────────────────
+
+@app.get("/admin/audit-log", response_model=AuditLogResponse)
+def admin_audit_log(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db=Depends(get_db),
+    user: dict = Depends(require_admin),
+) -> AuditLogResponse:
+    """Paginated admin audit trail."""
+    rows = (
+        db.query(AuditLog)
+        .order_by(AuditLog.timestamp.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    items = [
+        AuditLogItem(
+            id=r.id,
+            admin_email=r.admin_email,
+            action=r.action,
+            target_type=r.target_type,
+            target_id=r.target_id,
+            details=json.loads(r.details_json) if r.details_json else None,
+            timestamp=r.timestamp.isoformat() if r.timestamp else "",
+        )
+        for r in rows
+    ]
+    return AuditLogResponse(success=True, count=len(items), items=items)
+
+
+# ── Odoo Webhook Receiver ─────────────────────────────────────────────
+
+@app.post("/webhooks/odoo")
+def odoo_webhook(
+    payload: OdooWebhookPayload,
+    x_webhook_secret: str | None = Header(default=None),
+) -> dict:
+    """Receive push events from Odoo automations."""
+    expected = settings.odoo_webhook_secret
+    if expected and x_webhook_secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid webhook secret")
+
+    event = payload.event
+    logger.info("Odoo webhook received: event=%s model=%s record_id=%s", event, payload.model, payload.record_id)
+
+    # Process known events
+    if event == "payment.confirmed":
+        logger.info("Payment confirmed via webhook for record %s", payload.record_id)
+    elif event == "stock.updated":
+        logger.info("Stock updated via webhook for record %s", payload.record_id)
+    elif event == "partner.updated":
+        logger.info("Partner updated via webhook for record %s", payload.record_id)
+    else:
+        logger.warning("Unknown webhook event: %s", event)
+
+    return {"success": True, "event": event, "message": "Webhook processed"}

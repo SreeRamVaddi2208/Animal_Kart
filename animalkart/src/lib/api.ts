@@ -27,6 +27,7 @@ export type AuthResponse = {
   success: boolean;
   message: string;
   token: string;
+  refresh_token?: string | null;
   token_type: string;
   partner_id: number;
   full_name?: string | null;
@@ -236,6 +237,65 @@ function getStoredToken(): string | null {
   }
 }
 
+function getStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('animalkart-auth');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state?.refreshToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function updateStoredTokens(token: string, refreshToken: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem('animalkart-auth');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed?.state) {
+      parsed.state.token = token;
+      parsed.state.refreshToken = refreshToken;
+      localStorage.setItem('animalkart-auth', JSON.stringify(parsed));
+    }
+  } catch { /* ignore */ }
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = getStoredRefreshToken();
+  if (!refreshToken) return false;
+
+  // Prevent concurrent refresh calls
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.token && data.refresh_token) {
+        updateStoredTokens(data.token, data.refresh_token);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredToken();
   const authHeaders: Record<string, string> = {};
@@ -243,7 +303,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     authHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  let response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -253,13 +313,28 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     cache: 'no-store',
   });
 
-  // Auto-logout on expired/invalid token
+  // On 401, try silent refresh then retry once
   if (response.status === 401 && token) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('animalkart-auth');
-      window.location.href = '/auth/login';
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      const newToken = getStoredToken();
+      response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
+          ...(init?.headers || {}),
+        },
+        cache: 'no-store',
+      });
     }
-    throw new Error('Session expired. Redirecting to login...');
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('animalkart-auth');
+        window.location.href = '/auth/login';
+      }
+      throw new Error('Session expired. Redirecting to login...');
+    }
   }
 
   if (!response.ok) {
