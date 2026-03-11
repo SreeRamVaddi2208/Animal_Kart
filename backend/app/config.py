@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
@@ -43,6 +43,20 @@ class Settings:
     allowed_origins: list[str]
     database_url: str
 
+    # JWT
+    jwt_refresh_secret: str = ""
+    jwt_refresh_expire_days: int = 7
+
+    # SMTP
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "noreply@animalkart.com"
+
+    # Odoo webhooks
+    odoo_webhook_secret: str = ""
+
 
 settings = Settings(
     odoo_url=_normalize_odoo_url(os.getenv("ODOO_URL", "http://13.232.87.253:8069")),
@@ -58,6 +72,17 @@ settings = Settings(
     backend_port=int(os.getenv("BACKEND_PORT", "8000")),
     allowed_origins=_csv_to_list(os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")),
     database_url=os.getenv("DATABASE_URL", "sqlite:///./animalkart.db"),
+    # JWT refresh
+    jwt_refresh_secret=os.getenv("JWT_REFRESH_SECRET_KEY", ""),
+    jwt_refresh_expire_days=int(os.getenv("JWT_REFRESH_EXPIRE_DAYS", "7")),
+    # SMTP
+    smtp_host=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+    smtp_port=int(os.getenv("SMTP_PORT", "587")),
+    smtp_user=os.getenv("SMTP_USER", ""),
+    smtp_password=os.getenv("SMTP_PASSWORD", ""),
+    smtp_from=os.getenv("SMTP_FROM", "noreply@animalkart.com"),
+    # Odoo webhook
+    odoo_webhook_secret=os.getenv("ODOO_WEBHOOK_SECRET", ""),
 )
 
 

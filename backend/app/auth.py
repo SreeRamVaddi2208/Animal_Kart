@@ -19,7 +19,13 @@ security = HTTPBearer()
 
 SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "5d3f33ae6b57de10888d403c542e765f9f75be0ba7b794d6c1cdfd48529995f5")
 ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "525600"))
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "30"))
+
+REFRESH_SECRET_KEY: str = os.getenv(
+    "JWT_REFRESH_SECRET_KEY",
+    "61e2da009c32b97e66060fdcde74a63351845c6b2169b3ad472981df32e1ed1c",
+)
+REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("JWT_REFRESH_EXPIRE_DAYS", "7"))
 
 
 # ── Token helpers ────────────────────────────────────────────────────
@@ -28,8 +34,31 @@ def create_access_token(data: dict) -> str:
     """Create a signed JWT with embedded role, partner_id, and kyc_status."""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: dict) -> str:
+    """Create a long-lived refresh token for silent renewal."""
+    to_encode = {
+        "sub": data.get("sub"),
+        "partner_id": data.get("partner_id"),
+        "type": "refresh",
+    }
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode["exp"] = expire
+    return jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_refresh_token(token: str) -> dict:
+    """Decode and verify a refresh token; returns the JWT payload dict."""
+    try:
+        payload: dict = jwt.decode(token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
 
 def verify_token(
