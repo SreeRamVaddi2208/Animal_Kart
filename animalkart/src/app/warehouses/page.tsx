@@ -12,6 +12,7 @@ import { formatCurrency, formatNumber } from '@/lib/utils';
 import { useCartStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { fetchWarehouseStock } from '@/lib/api';
+import BuffaloLoader from '@/components/ui/BuffaloLoader';
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 const stagger = { visible: { transition: { staggerChildren: 0.1 } } };
@@ -144,7 +145,7 @@ export default function WarehousesPage() {
           </Button>
         </motion.div>
 
-        {loading && <p className="text-sm text-gray-500 mb-4">Loading live Odoo warehouse stock...</p>}
+        {loading && <BuffaloLoader />}
         {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
         {/* Warehouse Grid */}
