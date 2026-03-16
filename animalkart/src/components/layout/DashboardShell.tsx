@@ -10,7 +10,7 @@ import AnimatedCounter from '@/components/ui/AnimatedCounter';
 import {
     LayoutDashboard, Wallet, Users, Gift, FileText, ShoppingBag,
     ArrowRightLeft, ShieldCheck, Warehouse, BarChart3, CreditCard,
-    Menu, X,
+    Menu, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 /* ─── role-based nav config ─── */
@@ -44,18 +44,20 @@ const ROLE_BADGE = {
 };
 
 /* ─── Shared nav link renderer ─── */
-function NavLink({ href, label, icon: Icon, active, onClick }: {
-    href: string; label: string; icon: React.ElementType; active: boolean; onClick?: () => void;
+function NavLink({ href, label, icon: Icon, active, collapsed, onClick }: {
+    href: string; label: string; icon: React.ElementType; active: boolean; collapsed?: boolean; onClick?: () => void;
 }) {
     return (
         <Link
             href={href}
             onClick={onClick}
+            title={collapsed ? label : undefined}
             style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
-                padding: '10px 14px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                gap: collapsed ? 0 : 10,
+                padding: collapsed ? '12px' : '10px 14px',
                 borderRadius: 12,
                 fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -78,14 +80,23 @@ function NavLink({ href, label, icon: Icon, active, onClick }: {
                 }
             }}
         >
-            <Icon size={16} />
-            {label}
+            <Icon size={collapsed ? 20 : 16} />
+            {!collapsed && label}
         </Link>
     );
 }
 
-/* ─── Role badge ─── */
-function RoleBadge({ badge }: { badge: typeof ROLE_BADGE[keyof typeof ROLE_BADGE] }) {
+function RoleBadge({ badge, collapsed = false }: { badge: typeof ROLE_BADGE[keyof typeof ROLE_BADGE]; collapsed?: boolean }) {
+    if (collapsed) {
+        return (
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px',
+                borderRadius: 12, background: badge.bg, border: `1px solid ${badge.color}22`, marginBottom: 24,
+            }} title={`Signed in as ${badge.label}`}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: badge.color, flexShrink: 0, boxShadow: `0 0 6px ${badge.color}` }} />
+            </div>
+        );
+    }
     return (
         <div style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
@@ -104,6 +115,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const pathname = usePathname();
     const { user } = useAuthStore();
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const role = (user?.role as 'investor' | 'agent' | 'admin') || 'investor';
     const navLinks = NAV_CONFIG[role] ?? NAV_CONFIG.investor;
@@ -128,19 +140,73 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             <div style={{ display: 'flex', flex: 1, paddingTop: 64 }}>
                 {/* ── Desktop Left Sidebar ── */}
                 <aside
-                    className="hidden lg:flex flex-col"
+                    className="hidden lg:flex flex-col relative"
                     style={{
-                        width: 240, flexShrink: 0, position: 'sticky', top: 64,
+                        width: isCollapsed ? 80 : 240, 
+                        flexShrink: 0, position: 'sticky', top: 64,
                         height: 'calc(100vh - 64px)',
                         background: '#0a1811',
                         borderRight: '1px solid #1b3625',
-                        padding: '24px 12px', overflowY: 'auto',
+                        padding: isCollapsed ? '24px 8px' : '24px 12px', 
+                        overflowY: 'auto',
+                        transition: 'width 0.3s ease, padding 0.3s ease',
                     }}
                 >
-                    <RoleBadge badge={badge} />
+                    <button
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        style={{
+                            position: 'absolute',
+                            top: 24,
+                            right: isCollapsed ? 'auto' : -12,
+                            left: isCollapsed ? '50%' : 'auto',
+                            transform: isCollapsed ? 'translateX(-50%)' : 'none',
+                            zIndex: 10,
+                            background: '#0a1811',
+                            border: '1px solid #1b3625',
+                            borderRadius: '50%',
+                            width: 24,
+                            height: 24,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: 'rgba(255,255,255,0.7)',
+                            opacity: isCollapsed ? 0 : 1, // Only show toggle fully when hovered or expanded. Handled by hover below mostly
+                        }}
+                        className="hover:text-white hover:bg-[#1b3625] transition-colors"
+                        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                    </button>
+
+                    {/* Show expand button when collapsed at the top center nicely */}
+                    {isCollapsed && (
+                        <button
+                          onClick={() => setIsCollapsed(false)}
+                          style={{
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid #1b3625',
+                              borderRadius: '8px',
+                              width: '100%',
+                              padding: '8px 0',
+                              marginBottom: 16,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'rgba(255,255,255,0.7)',
+                          }}
+                          className="hover:text-white hover:bg-[#1b3625] transition-colors"
+                          title="Expand sidebar"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    )}
+
+                    <RoleBadge badge={badge} collapsed={isCollapsed} />
                     <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {navLinks.map(link => (
-                            <NavLink key={link.href} href={link.href} label={link.label} icon={link.icon} active={isActive(link.href)} />
+                            <NavLink key={link.href} href={link.href} label={link.label} icon={link.icon} active={isActive(link.href)} collapsed={isCollapsed} />
                         ))}
                     </nav>
                 </aside>
