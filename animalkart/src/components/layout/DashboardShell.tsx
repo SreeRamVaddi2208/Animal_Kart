@@ -44,8 +44,8 @@ const ROLE_BADGE = {
 };
 
 /* ─── Shared nav link renderer ─── */
-function NavLink({ href, label, icon: Icon, active, collapsed, onClick }: {
-    href: string; label: string; icon: React.ElementType; active: boolean; collapsed?: boolean; onClick?: () => void;
+function NavLink({ href, label, icon: Icon, active, collapsed, badge, onClick }: {
+    href: string; label: string; icon: React.ElementType; active: boolean; collapsed?: boolean; badge?: number; onClick?: () => void;
 }) {
     return (
         <Link
@@ -81,7 +81,28 @@ function NavLink({ href, label, icon: Icon, active, collapsed, onClick }: {
             }}
         >
             <Icon size={collapsed ? 20 : 16} />
-            {!collapsed && label}
+            {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+            {!collapsed && badge !== undefined && badge > 0 && (
+                <span style={{
+                    background: active ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.2)',
+                    color: active ? '#34d399' : '#fbbf24',
+                    fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 100,
+                    marginLeft: 'auto'
+                }}>
+                    {badge}
+                </span>
+            )}
+            {collapsed && badge !== undefined && badge > 0 && (
+                <span style={{
+                    position: 'absolute', top: 6, right: 6,
+                    background: '#fbbf24', color: 'black',
+                    fontSize: 9, fontWeight: 800, width: 14, height: 14,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: '50%'
+                }}>
+                    {badge > 9 ? '9+' : badge}
+                </span>
+            )}
         </Link>
     );
 }
@@ -111,14 +132,22 @@ function RoleBadge({ badge, collapsed = false }: { badge: typeof ROLE_BADGE[keyo
     );
 }
 
-export default function DashboardShell({ children }: { children: React.ReactNode }) {
+export default function DashboardShell({ 
+    children, 
+    navItemsOverride, 
+    activeHref 
+}: { 
+    children: React.ReactNode, 
+    navItemsOverride?: { href: string; label: string; icon: React.ElementType; badge?: number }[],
+    activeHref?: string
+}) {
     const pathname = usePathname();
     const { user } = useAuthStore();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const role = (user?.role as 'investor' | 'agent' | 'admin') || 'investor';
-    const navLinks = NAV_CONFIG[role] ?? NAV_CONFIG.investor;
+    const navLinks = navItemsOverride || (NAV_CONFIG[role] ?? NAV_CONFIG.investor);
     const badge = ROLE_BADGE[role] ?? ROLE_BADGE.investor;
 
     /* Close drawer on route change */
@@ -130,8 +159,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return () => { document.body.style.overflow = ''; };
     }, [drawerOpen]);
 
-    const isActive = (href: string) =>
-        pathname === href || (href !== '/' && pathname.startsWith(href) && href.split('/').length >= 3);
+    const isActive = (href: string) => {
+        if (activeHref) return activeHref === href;
+        return pathname === href || (href !== '/' && pathname.startsWith(href) && href.split('/').length >= 3);
+    };
 
     return (
         <div style={{ minHeight: '100vh', background: '#030a06', color: 'white', display: 'flex', flexDirection: 'column' }}>
@@ -206,7 +237,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     <RoleBadge badge={badge} collapsed={isCollapsed} />
                     <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {navLinks.map(link => (
-                            <NavLink key={link.href} href={link.href} label={link.label} icon={link.icon} active={isActive(link.href)} collapsed={isCollapsed} />
+                            <NavLink key={link.href} href={link.href} label={link.label} icon={link.icon} active={isActive(link.href)} collapsed={isCollapsed} badge={(link as any).badge} />
                         ))}
                     </nav>
                 </aside>
@@ -290,6 +321,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                                             label={link.label}
                                             icon={link.icon}
                                             active={isActive(link.href)}
+                                            badge={(link as any).badge}
                                             onClick={() => setDrawerOpen(false)}
                                         />
                                     ))}

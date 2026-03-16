@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShieldCheck, Users, CreditCard, Warehouse, BarChart3,
-  IndianRupee, Package,
+  IndianRupee, Package, LayoutDashboard
 } from 'lucide-react';
 import DashboardShell, { DashCard } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
@@ -23,9 +23,7 @@ function AdminDashboardInner() {
   const searchParams = useSearchParams();
 
   const paramTab = searchParams.get('tab') as Tab | null;
-  const initialTab: Tab = paramTab && VALID_TABS.includes(paramTab) ? paramTab : 'kyc';
-
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const currentTab: Tab = paramTab && VALID_TABS.includes(paramTab) ? paramTab : 'kyc';
   const [pendingKyc, setPendingKyc] = useState(0);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unitsSold, setUnitsSold] = useState(0);
@@ -51,23 +49,20 @@ function AdminDashboardInner() {
       .finally(() => setLoadingStats(false));
   }, []);
 
-  /* Persist tab to URL on change */
-  const handleTabChange = (next: Tab) => {
-    setTab(next);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', next);
-    router.replace(`?${params.toString()}`, { scroll: false });
-  };
-
-  const TABS: { key: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { key: 'kyc', label: 'KYC Approvals', icon: Users, badge: pendingKyc },
-    { key: 'payments', label: 'Payment Approvals', icon: CreditCard, badge: pendingPayments },
-    { key: 'warehouses', label: 'Warehouse Mgmt', icon: Warehouse },
-    { key: 'pnl', label: 'Profit & Loss', icon: BarChart3 },
+  const navItems = [
+    { href: '/dashboard/admin', label: 'Overview', icon: LayoutDashboard },
+    { href: '/dashboard/admin?tab=kyc', label: 'KYC Approvals', icon: Users, badge: pendingKyc },
+    { href: '/dashboard/admin?tab=payments', label: 'Payment Approvals', icon: CreditCard, badge: pendingPayments },
+    { href: '/dashboard/admin?tab=warehouses', label: 'Warehouse Mgmt', icon: Warehouse },
+    { href: '/dashboard/admin?tab=pnl', label: 'Profit & Loss', icon: BarChart3 },
   ];
 
+  // If no tab is specified, we check if it is explicitly the overview or defaults to KYC logic.
+  // Actually, the user asked to move them all. Let's highlight the exact href.
+  const activeHref = paramTab ? `/dashboard/admin?tab=${paramTab}` : '/dashboard/admin';
+
   return (
-    <DashboardShell>
+    <DashboardShell navItemsOverride={navItems} activeHref={activeHref}>
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 32 }}>
         <div style={{ width: 52, height: 52, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(99,102,241,0.3)' }}>
@@ -88,42 +83,20 @@ function AdminDashboardInner() {
         <DashCard label="Total Capacity" value={`${totalCapacity.toLocaleString()} units`} icon={<Warehouse size={16} />} iconColor="#6ee7b7" loading={loadingStats} />
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-        {TABS.map(t => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => handleTabChange(t.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 14, fontSize: 13, fontWeight: active ? 700 : 500, cursor: 'pointer',
-                color: active ? '#34d399' : 'rgba(255,255,255,0.5)',
-                background: active ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)',
-                border: active ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)',
-                transition: 'all 0.2s',
-              }}
-            >
-              <Icon size={15} />
-              {t.label}
-              {t.badge !== undefined && t.badge > 0 && (
-                <span style={{ background: active ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.2)', color: active ? '#34d399' : '#fbbf24', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 100 }}>
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+
 
       {/* Tab content — sub-components render their own content */}
       <div style={{ background: 'transparent' }}>
-        {tab === 'kyc' && <KycTab />}
-        {tab === 'payments' && <PaymentsTab />}
-        {tab === 'warehouses' && <WarehousesTab />}
-        {tab === 'pnl' && <PnlTab />}
+        {!paramTab && (
+          <div className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-8 text-center mt-8">
+            <h2 className="text-xl font-bold text-white mb-2">Welcome to the Admin Panel</h2>
+            <p className="text-gray-400">Please select an option from the sidebar to manage AnimalKart operations.</p>
+          </div>
+        )}
+        {currentTab === 'kyc' && paramTab && <KycTab />}
+        {currentTab === 'payments' && paramTab && <PaymentsTab />}
+        {currentTab === 'warehouses' && paramTab && <WarehousesTab />}
+        {currentTab === 'pnl' && paramTab && <PnlTab />}
       </div>
     </DashboardShell>
   );
