@@ -2,9 +2,10 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   ShieldCheck, Users, CreditCard, Warehouse, BarChart3,
-  IndianRupee, Package, LayoutDashboard
+  IndianRupee, Package, LayoutDashboard, ArrowRight
 } from 'lucide-react';
 import DashboardShell, { DashCard } from '@/components/layout/DashboardShell';
 import { useAuthStore } from '@/lib/store';
@@ -88,9 +89,75 @@ function AdminDashboardInner() {
       {/* Tab content — sub-components render their own content */}
       <div style={{ background: 'transparent' }}>
         {!paramTab && (
-          <div className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-8 text-center mt-8">
-            <h2 className="text-xl font-bold text-white mb-2">Welcome to the Admin Panel</h2>
-            <p className="text-gray-400">Please select an option from the sidebar to manage AnimalKart operations.</p>
+          <div className="mt-8 space-y-6">
+            <h2 className="text-xl font-bold text-white mb-4">Operations Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* KYC Summary Card */}
+              <Link href="/dashboard/admin?tab=kyc" className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-6 hover:border-[#34d399] transition-all group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#fbbf24]/10 flex items-center justify-center text-[#fbbf24]">
+                      <Users size={20} />
+                    </div>
+                    {pendingKyc > 0 && <span className="bg-[#fbbf24]/20 text-[#fbbf24] text-xs font-bold px-2 py-1 rounded-full">{pendingKyc} Pending</span>}
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-[#34d399] transition-colors">KYC Approvals</h3>
+                  <p className="text-sm text-gray-400">Review and verify investor identity documents to enable their accounts for trading.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-[#34d399]">
+                  Manage KYC <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+
+              {/* Payments Summary Card */}
+              <Link href="/dashboard/admin?tab=payments" className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-6 hover:border-[#34d399] transition-all group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#60a5fa]/10 flex items-center justify-center text-[#60a5fa]">
+                      <CreditCard size={20} />
+                    </div>
+                    {pendingPayments > 0 && <span className="bg-[#60a5fa]/20 text-[#60a5fa] text-xs font-bold px-2 py-1 rounded-full">{pendingPayments} Pending</span>}
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-[#34d399] transition-colors">Payment Approvals</h3>
+                  <p className="text-sm text-gray-400">Verify manual bank transfers and wire deposits to credit user wallets for unit purchases.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-[#34d399]">
+                  Manage Payments <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+
+              {/* Warehouses Summary Card */}
+              <Link href="/dashboard/admin?tab=warehouses" className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-6 hover:border-[#34d399] transition-all group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#6ee7b7]/10 flex items-center justify-center text-[#6ee7b7]">
+                      <Warehouse size={20} />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-[#34d399] transition-colors">Warehouse Management</h3>
+                  <p className="text-sm text-gray-400">Sync and track live unit inventory and capacity across all farm locations via Odoo.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-[#34d399]">
+                  View Warehouses <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+
+              {/* PnL Summary Card */}
+              <Link href="/dashboard/admin?tab=pnl" className="bg-[#0a1811] border border-[#1b3625] rounded-2xl p-6 hover:border-[#34d399] transition-all group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#c084fc]/10 flex items-center justify-center text-[#c084fc]">
+                      <BarChart3 size={20} />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-[#34d399] transition-colors">Profit & Loss Reporting</h3>
+                  <p className="text-sm text-gray-400">Generate PNL reports from Odoo accounting data to track platform revenue and agent commissions.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-[#34d399]">
+                  View Reports <ArrowRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+            </div>
           </div>
         )}
         {currentTab === 'kyc' && paramTab && <KycTab />}
