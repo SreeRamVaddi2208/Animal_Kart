@@ -45,7 +45,7 @@ export default function BuffaloLoader() {
           <div className="w-8 h-8 bg-[#9effc8] rounded-lg flex items-center justify-center">
             <span className="material-symbols-outlined text-[#00643e] text-xl">pets</span>
           </div>
-          <span className="headline-font font-bold text-xl tracking-tight">MURRAH TECH</span>
+          <span className="headline-font font-bold text-xl tracking-tight">ANIMAL KART</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="material-symbols-outlined text-[#9dafa9]">account_circle</span>
@@ -81,7 +81,7 @@ export default function BuffaloLoader() {
             <div className="flex justify-between items-end mb-8">
               <div className="space-y-1">
                 <span className="label-style text-xs text-[#00ec9a] animate-pulse">System Initializing</span>
-                <h1 className="headline-font text-4xl font-light tracking-tight">Connecting to <span className="text-[#9effc8] font-bold">AnimalKart</span></h1>
+                <h1 className="headline-font text-4xl font-light tracking-tight"><span className="text-[#9effc8] font-bold">Loading the Warehouses</span></h1>
               </div>
               <div className="text-right">
                 <span className="headline-font text-5xl font-bold text-[#9effc8]">{progress}%</span>
@@ -103,7 +103,7 @@ export default function BuffaloLoader() {
               </div>
               <div className="pt-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm text-[#84ecff] animate-bounce">monitoring</span>
-                <p className="text-xs text-[#9dafa9] font-medium">Connecting to Murrah Biosensors across northern territories...</p>
+                <p className="text-xs text-[#9dafa9] font-medium">Loading...</p>
               </div>
             </div>
             
@@ -125,39 +125,6 @@ export default function BuffaloLoader() {
           </div>
         </div>
       </main>
-
-      {/* Bottom Interface Bar */}
-      <footer className="bg-[#051613] px-8 py-4 border-t border-[#3b4b47]/10 loader-font-body mt-auto">
-        <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
-          <div className="flex gap-12">
-            <div className="flex items-center gap-3 opacity-30">
-              <span className="material-symbols-outlined">dashboard</span>
-              <span className="label-style text-xs font-bold hidden sm:inline-block">Dashboard</span>
-            </div>
-            <div className="flex items-center gap-3 opacity-30">
-              <span className="material-symbols-outlined">pets</span>
-              <span className="label-style text-xs font-bold hidden sm:inline-block">Livestock</span>
-            </div>
-            <div className="flex items-center gap-3 text-[#9effc8]">
-              <span className="material-symbols-outlined animate-pulse">monitoring</span>
-              <span className="label-style text-xs font-bold hidden sm:inline-block">Analytics</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="h-1 w-12 bg-[#3b4b47]/30 rounded-full overflow-hidden">
-              <div className="h-full bg-[#9effc8] w-1/3"></div>
-            </div>
-            <span className="label-style text-[10px] text-[#9dafa9]">Version 4.2.0-Alpha</span>
-          </div>
-        </div>
-      </footer>
-
-      {/* Interactive Elements */}
-      <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 flex flex-col gap-4">
-        <button className="w-14 h-14 rounded-xl bg-[#9effc8] flex items-center justify-center shadow-lg hover:bg-[#00ec9a] transition-colors hover:scale-105 active:scale-95 duration-200">
-          <span className="material-symbols-outlined text-[#00643e]">support_agent</span>
-        </button>
-      </div>
     </div>
   );
 }
