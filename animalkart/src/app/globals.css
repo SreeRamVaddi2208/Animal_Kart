@@ -300,23 +300,19 @@
   animation: ak-scroll-bounce 2.2s ease-in-out infinite;
 }
 
-/* Glassmorphism card */
+/* Solid card */
 .ak-glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(52, 211, 153, 0.18);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: #0a1811;
+  border: 1px solid #1b3625;
   border-radius: 16px;
 }
 
 .ak-glass-hover {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.2s ease-in-out;
 }
 
 .ak-glass-hover:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(52, 211, 153, 0.12);
+  border-color: #10b981;
 }
 
 /* Pulse border */

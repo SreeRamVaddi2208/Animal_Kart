@@ -122,7 +122,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         pathname === href || (href !== '/' && pathname.startsWith(href) && href.split('/').length >= 3);
 
     return (
-        <div style={{ minHeight: '100vh', background: '#030d07', color: 'white', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ minHeight: '100vh', background: '#030a06', color: 'white', display: 'flex', flexDirection: 'column' }}>
             <Navbar />
 
             <div style={{ display: 'flex', flex: 1, paddingTop: 64 }}>
@@ -132,8 +132,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     style={{
                         width: 240, flexShrink: 0, position: 'sticky', top: 64,
                         height: 'calc(100vh - 64px)',
-                        background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(12px)',
-                        borderRight: '1px solid rgba(52,211,153,0.1)',
+                        background: '#0a1811',
+                        borderRight: '1px solid #1b3625',
                         padding: '24px 12px', overflowY: 'auto',
                     }}
                 >
@@ -248,9 +248,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                         padding: '32px 24px',
                         maxWidth: '100%',
                         overflowX: 'hidden',
-                        backgroundImage:
-                            'linear-gradient(rgba(52,211,153,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.025) 1px, transparent 1px)',
-                        backgroundSize: '60px 60px',
+                        background: '#030a06',
                     }}
                 >
                     <div style={{ maxWidth: 1280, margin: '0 auto' }}>

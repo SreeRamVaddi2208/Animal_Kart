@@ -67,21 +67,12 @@ export default function Navbar() {
 
   const navLinks = user?.role === 'agent' ? agentLinks : user?.role === 'admin' ? adminLinks : investorLinks;
 
-  /* Nav appearance: dark glass on landing hero, solid light elsewhere */
-  const darkMode = isLanding;
-  const navBg = darkMode
-    ? scrolled
-      ? 'rgba(6,20,15,0.92)'
-      : 'rgba(0,0,0,0.15)'
-    : 'rgba(255,255,255,0.97)';
-  const navBorder = darkMode
-    ? scrolled
-      ? '1px solid rgba(52,211,153,0.25)'
-      : '1px solid rgba(255,255,255,0.08)'
-    : '1px solid rgba(52,211,153,0.12)';
-  const textColor = darkMode ? 'rgba(255,255,255,0.8)' : '#374151';
-  const logoColor = darkMode ? '#34d399' : '#16a34a';
-  const logoTextColor = darkMode ? 'white' : '#111827';
+  /* Nav appearance: always dark to blend in with solid dashboard */
+  const navBg = '#030a06';
+  const navBorder = '1px solid #1b3625';
+  const textColor = 'rgba(255,255,255,0.8)';
+  const logoColor = '#10b981';
+  const logoTextColor = 'white';
 
   return (
     <nav
@@ -92,10 +83,7 @@ export default function Navbar() {
         right: 0,
         zIndex: 50,
         background: navBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderBottom: navBorder,
-        boxShadow: scrolled && darkMode ? '0 8px 32px rgba(0,0,0,0.4)' : 'none',
         transition: 'all 0.4s ease',
       }}
     >
@@ -113,37 +101,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop auth nav links */}
-          {isAuthenticated && (
-            <div className="hidden md:flex items-center gap-1">
-              {navLinks.map(link => {
-                const Icon = link.icon;
-                const active = pathname === link.href;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', borderRadius: 10, fontSize: 14, fontWeight: 500,
-                      transition: 'all 0.2s',
-                      color: active ? '#34d399' : textColor,
-                      background: active ? 'rgba(52,211,153,0.1)' : 'transparent',
-                    }}
-                    onMouseEnter={e => {
-                      if (!active) (e.currentTarget as HTMLElement).style.background = darkMode ? 'rgba(255,255,255,0.07)' : '#f9fafb';
-                    }}
-                    onMouseLeave={e => {
-                      if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    }}
-                  >
-                    <Icon size={15} />
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+
 
           {/* Public nav links */}
           {!isAuthenticated && (
@@ -222,8 +180,8 @@ export default function Navbar() {
                   <button
                     style={{
                       background: 'transparent',
-                      border: darkMode ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(52,211,153,0.3)',
-                      color: darkMode ? 'rgba(255,255,255,0.8)' : '#16a34a',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'rgba(255,255,255,0.8)',
                       borderRadius: 10,
                       padding: '7px 18px',
                       fontSize: 14,
@@ -278,7 +236,7 @@ export default function Navbar() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden"
-            style={{ borderTop: navBorder, background: darkMode ? 'rgba(4,15,9,0.97)' : 'white', backdropFilter: 'blur(20px)' }}
+            style={{ borderTop: navBorder, background: 'rgba(4,15,9,0.97)', backdropFilter: 'blur(20px)' }}
           >
             <div className="px-4 py-3 space-y-1">
               {isAuthenticated ? (
@@ -314,7 +272,7 @@ export default function Navbar() {
                   ))}
                   <div className="pt-2 flex flex-col gap-2">
                     <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
-                      <button style={{ width: '100%', background: 'transparent', border: '1px solid rgba(52,211,153,0.3)', color: darkMode ? 'white' : '#16a34a', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Login</button>
+                      <button style={{ width: '100%', background: 'transparent', border: '1px solid rgba(52,211,153,0.3)', color: 'white', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>Login</button>
                     </Link>
                     <Link href="/auth/register" onClick={() => setMobileOpen(false)}>
                       <button style={{ width: '100%', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', border: 'none', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Get Started</button>
