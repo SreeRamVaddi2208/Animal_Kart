@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function BuffaloLoader() {
+export default function BuffaloLoader({ embedded = false }: { embedded?: boolean }) {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -18,7 +18,10 @@ export default function BuffaloLoader() {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col min-h-screen bg-[#03110e] text-[#dff2ec] overflow-hidden">
+    <div className={embedded 
+      ? "relative flex flex-col w-full h-full min-h-[500px] bg-[#03110e] text-[#dff2ec] rounded-xl overflow-hidden border border-[#3b4b47]/20" 
+      : "fixed inset-0 z-[100] flex flex-col min-h-screen bg-[#03110e] text-[#dff2ec] overflow-hidden"
+    }>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');

@@ -258,6 +258,8 @@ function StockDrawer({ warehouse, onClose }: { warehouse: WarehouseRow; onClose:
   );
 }
 
+import BuffaloLoader from '@/components/ui/BuffaloLoader';
+
 /* ── Main Component ── */
 function WarehousesTabInner() {
   const router = useRouter();
@@ -326,6 +328,8 @@ function WarehousesTabInner() {
     { label: 'Units Available', value: totals.avail, color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
   ];
 
+  if (loading) return <BuffaloLoader embedded />;
+
   return (
     <motion.div initial="hidden" whileInView="visible" viewport={viewport} variants={stagger} className="space-y-4">
 
@@ -372,7 +376,7 @@ function WarehousesTabInner() {
 
       {/* States */}
       {error && <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 12, padding: '12px 16px' }}><AlertCircle style={{ width: 14, height: 14 }} />{error}</div>}
-      {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: '48px 0', color: TEXT_DIM }}><Warehouse style={{ width: 48, height: 48, margin: '0 auto 12px', opacity: 0.2 }} /><p style={{ fontWeight: 600 }}>No warehouses found</p></div>}
+      {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '48px 0', color: TEXT_DIM }}><Warehouse style={{ width: 48, height: 48, margin: '0 auto 12px', opacity: 0.2 }} /><p style={{ fontWeight: 600 }}>No warehouses found</p></div>}
 
       {/* Warehouse Cards */}
       <AnimatePresence>
